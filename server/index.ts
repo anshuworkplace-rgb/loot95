@@ -199,6 +199,23 @@ app.get('/api/metrics', (_req, res) => {
   });
 });
 
+// ─── Serve Built Static Frontend (Production SPA Fallback) ──────
+const distPath = path.join(process.cwd(), 'dist');
+app.use(express.static(distPath));
+
+// Catch-all handler for single page app (SPA) routing
+app.get('*', (req, res, next) => {
+  if (req.path.startsWith('/api')) {
+    return next();
+  }
+  const indexPath = path.join(distPath, 'index.html');
+  if (req.accepts('html')) {
+    res.sendFile(indexPath);
+  } else {
+    next();
+  }
+});
+
 // ─── Start Server ─────────────────────────────────────────────
 
 app.listen(PORT, () => {
