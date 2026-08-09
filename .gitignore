@@ -46,3 +46,5 @@ data/store.json
 *.sw?
 .vscode/
 .idea/
+
+.vercel

@@ -235,7 +235,7 @@ export function initializeSimulator(): void {
       subcategory: template.subcategory,
       platform: 'simulator',
       platformProductId: productId,
-      url: `https://amazon.in/dp/${productId}`,
+      url: `https://www.amazon.in/s?k=${encodeURIComponent(template.brand + ' ' + template.model)}`,
       imageUrl: template.imageUrl,
       mrp: template.mrp,
       currentPrice: template.normalHigh,
