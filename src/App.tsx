@@ -234,6 +234,36 @@ const PreferencesView: React.FC = () => {
 
       <div style={{ background: 'var(--bg-surface)', padding: '24px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)', display: 'flex', flexDirection: 'column', gap: '24px', boxShadow: '0 8px 32px rgba(0,0,0,0.4)' }}>
         
+        {/* Master No Filter Toggle */}
+        <div style={{ background: 'rgba(56, 189, 248, 0.1)', border: '1px solid rgba(56, 189, 248, 0.4)', padding: '16px', borderRadius: 'var(--radius-sm)' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}>
+            <input
+              type="checkbox"
+              checked={!excludeAccessories && minDiscount === '0' && minPrice === '0'}
+              onChange={(e) => {
+                if (e.target.checked) {
+                  setExcludeAccessories(false);
+                  setMinDiscount('0');
+                  setMinPrice('0');
+                } else {
+                  setExcludeAccessories(true);
+                  setMinDiscount('30');
+                  setMinPrice('1000');
+                }
+              }}
+              style={{ width: '18px', height: '18px', accentColor: 'var(--accent-cyan)', cursor: 'pointer' }}
+            />
+            <div>
+              <div style={{ color: 'var(--accent-cyan)', fontWeight: 800, fontSize: '0.9rem' }}>
+                🔓 MASTER SWITCH: NO FILTERS (SHOW ALL RAW DEALS)
+              </div>
+              <div style={{ color: 'var(--text-secondary)', fontSize: '0.75rem', marginTop: '2px' }}>
+                Bypass all price floors, category restrictions, brand rules, and anti-junk shields.
+              </div>
+            </div>
+          </label>
+        </div>
+
         {/* Anti-Junk Shield */}
         <div style={{ background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.3)', padding: '16px', borderRadius: 'var(--radius-sm)' }}>
           <label style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}>
@@ -245,10 +275,10 @@ const PreferencesView: React.FC = () => {
             />
             <div>
               <div style={{ color: 'var(--loot-green)', fontWeight: 800, fontSize: '0.9rem' }}>
-                🛡️ ANTI-JUNK ACCESSORY SHIELD (RECOMMENDED)
+                🛡️ ANTI-JUNK ACCESSORY SHIELD {excludeAccessories ? '(ACTIVE)' : '🔓 [NO FILTER — OFF]' }
               </div>
               <div style={{ color: 'var(--text-secondary)', fontSize: '0.75rem', marginTop: '2px' }}>
-                Automatically reject phone back covers, silicone cases, tempered glass, cables, adapters, and cheap trinkets under ₹500.
+                {excludeAccessories ? 'Automatically rejecting phone back covers, silicone cases, tempered glass, cables & cheap trinkets.' : 'ALLOWING ALL ACCESSORIES (Covers, cases, cables included).'}
               </div>
             </div>
           </label>
@@ -264,8 +294,8 @@ const PreferencesView: React.FC = () => {
             onChange={(e) => setMinPrice(e.target.value)}
             style={{ width: '100%', padding: '12px', background: 'var(--bg-deep)', border: '1px solid var(--border-default)', color: 'var(--text-primary)', borderRadius: 'var(--radius-sm)', cursor: 'pointer' }}
           >
-            <option value="0">Any Price (Include budget items)</option>
-            <option value="1000">₹1,000+ (Exclude cheap sub-₹1000 accessories)</option>
+            <option value="0">🔓 0 (NO FILTER — Allow All Prices & Budget Items)</option>
+            <option value="1000">₹1,000+ (Exclude sub-₹1000 accessories)</option>
             <option value="3000">₹3,000+ (Major Audio, Smartwatches, Tablets)</option>
             <option value="10000">₹10,000+ (Smartphones, Laptops, 4K TVs Only)</option>
           </select>
@@ -281,10 +311,11 @@ const PreferencesView: React.FC = () => {
             onChange={(e) => setMinDiscount(e.target.value)}
             style={{ width: '100%', padding: '12px', background: 'var(--bg-deep)', border: '1px solid var(--border-default)', color: 'var(--text-primary)', borderRadius: 'var(--radius-sm)', cursor: 'pointer' }}
           >
-            <option value="90">90%+ Real Discount (LOOT 95 Events Only)</option>
-            <option value="80">80%+ Real Discount (Extreme Drops & Price Errors)</option>
-            <option value="50">50%+ Real Discount (Hot & Major Deals)</option>
+            <option value="0">🔓 0% (NO FILTER — Show All Raw Items Regardless of Discount)</option>
             <option value="30">30%+ Real Discount (All Genuine Offers)</option>
+            <option value="50">50%+ Real Discount (Hot & Major Deals)</option>
+            <option value="80">80%+ Real Discount (Extreme Drops & Price Errors)</option>
+            <option value="90">90%+ Real Discount (LOOT 95 Events Only)</option>
           </select>
         </div>
 

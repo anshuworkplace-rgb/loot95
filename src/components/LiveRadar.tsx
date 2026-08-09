@@ -29,13 +29,13 @@ export const LiveRadar: React.FC<LiveRadarProps> = ({
       return false;
     }
     // Category filter
-    if (categoryFilter !== 'ALL' && deal.product.subcategory !== categoryFilter) {
+    if (!categoryFilter.startsWith('ALL') && deal.product.subcategory !== categoryFilter) {
       return false;
     }
     return true;
   });
 
-  const categories = ['ALL', 'Smartphones', 'Headphones', 'Earbuds', 'Laptops', 'Tablets', 'TVs', 'Cameras', 'Smartwatches', 'Gaming', 'Appliances'];
+  const categories = ['ALL (NO FILTER)', 'Smartphones', 'Headphones', 'Earbuds', 'Laptops', 'Tablets', 'TVs', 'Cameras', 'Smartwatches', 'Gaming', 'Appliances'];
 
   return (
     <div className="deal-feed">
@@ -48,13 +48,14 @@ export const LiveRadar: React.FC<LiveRadarProps> = ({
         </div>
 
         <div className="feed-filters">
-          {['ALL', 'LOOT_95', 'EXTREME', 'HOT', 'GREAT'].map(filter => (
+          {['ALL', 'NO_FILTER', 'LOOT_95', 'EXTREME', 'HOT', 'GREAT'].map(filter => (
             <button
               key={filter}
               className={`filter-btn ${activeFilter === filter ? 'active' : ''}`}
               onClick={() => onFilterChange(filter)}
+              style={filter === 'NO_FILTER' ? { border: '1px solid var(--accent-cyan)', color: 'var(--accent-cyan)' } : {}}
             >
-              {filter.replace('_', ' ')}
+              {filter === 'NO_FILTER' ? '🔓 NO FILTER (RAW)' : filter.replace('_', ' ')}
             </button>
           ))}
         </div>
