@@ -98,8 +98,10 @@ export async function fetchRealAmazonDeals(query: string = 'deals of the day') {
       const asin = item.asin || item.product_asin || uuid().slice(0, 8);
       const productId = `amz_in_${asin}`;
       const title = item.product_title || item.title || 'Amazon India Deal';
-      const brand = item.product_by_line || extractBrand(title);
-      const url = item.product_url || `https://www.amazon.in/dp/${asin}`;
+      const rawUrl = item.product_url || item.url || item.detail_url;
+      const url = (rawUrl && typeof rawUrl === 'string' && rawUrl.startsWith('http'))
+        ? rawUrl
+        : `https://www.amazon.in/s?k=${encodeURIComponent(title)}`;
       const imageUrl = item.product_photo || item.image || item.photo || '';
       const rating = item.product_star_rating ? parseFloat(String(item.product_star_rating)) : 4.0;
       const reviewCount = item.product_num_ratings ? parseInt(String(item.product_num_ratings), 10) : 100;

@@ -56,14 +56,23 @@ class Store {
   // ─── Purge Simulated Data ──────────────────────────────────────
   purgeSimulatedData(): void {
     this.connectors.delete('simulator');
-    for (const [id] of this.products.entries()) {
+    for (const [id, p] of this.products.entries()) {
       if (id.startsWith('sim_') || id.startsWith('amz_in_sim_')) {
         this.products.delete(id);
         this.priceHistory.delete(id);
         this.priceStats.delete(id);
+      } else if (p) {
+        if (!p.url || !p.url.startsWith('http') || p.url.includes('B09R673DBP')) {
+          p.url = `https://www.amazon.in/s?k=${encodeURIComponent(p.title)}`;
+        }
       }
     }
     this.dealEvents = this.dealEvents.filter(d => !d.productId.startsWith('sim_') && !d.productId.startsWith('amz_in_sim_'));
+    for (const d of this.dealEvents) {
+      if (!d.url || !d.url.startsWith('http') || d.url.includes('B09R673DBP')) {
+        d.url = `https://www.amazon.in/s?k=${encodeURIComponent(d.title)}`;
+      }
+    }
     this.metrics.productsMonitored = this.products.size;
   }
 

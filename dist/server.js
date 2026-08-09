@@ -60,14 +60,23 @@ var init_store = __esm({
       // ─── Purge Simulated Data ──────────────────────────────────────
       purgeSimulatedData() {
         this.connectors.delete("simulator");
-        for (const [id] of this.products.entries()) {
+        for (const [id, p] of this.products.entries()) {
           if (id.startsWith("sim_") || id.startsWith("amz_in_sim_")) {
             this.products.delete(id);
             this.priceHistory.delete(id);
             this.priceStats.delete(id);
+          } else if (p) {
+            if (!p.url || !p.url.startsWith("http") || p.url.includes("B09R673DBP")) {
+              p.url = `https://www.amazon.in/s?k=${encodeURIComponent(p.title)}`;
+            }
           }
         }
         this.dealEvents = this.dealEvents.filter((d) => !d.productId.startsWith("sim_") && !d.productId.startsWith("amz_in_sim_"));
+        for (const d of this.dealEvents) {
+          if (!d.url || !d.url.startsWith("http") || d.url.includes("B09R673DBP")) {
+            d.url = `https://www.amazon.in/s?k=${encodeURIComponent(d.title)}`;
+          }
+        }
         this.metrics.productsMonitored = this.products.size;
       }
       // ─── Products ───────────────────────────────────────────────
@@ -1190,8 +1199,8 @@ async function fetchRealAmazonDeals(query = "deals of the day") {
       const asin = item.asin || item.product_asin || uuid3().slice(0, 8);
       const productId = `amz_in_${asin}`;
       const title = item.product_title || item.title || "Amazon India Deal";
-      const brand = item.product_by_line || extractBrand(title);
-      const url2 = item.product_url || `https://www.amazon.in/dp/${asin}`;
+      const rawUrl = item.product_url || item.url || item.detail_url;
+      const url2 = rawUrl && typeof rawUrl === "string" && rawUrl.startsWith("http") ? rawUrl : `https://www.amazon.in/s?k=${encodeURIComponent(title)}`;
       const imageUrl = item.product_photo || item.image || item.photo || "";
       const rating = item.product_star_rating ? parseFloat(String(item.product_star_rating)) : 4;
       const reviewCount = item.product_num_ratings ? parseInt(String(item.product_num_ratings), 10) : 100;
@@ -1268,10 +1277,6 @@ async function fetchRealAmazonDeals(query = "deals of the day") {
     });
     return [];
   }
-}
-function extractBrand(title) {
-  const words = title.split(" ");
-  return words[0] || "Generic";
 }
 var pollTimer = null;
 function startRealAmazonPolling(intervalMs = 2e4) {
