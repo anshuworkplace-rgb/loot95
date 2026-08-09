@@ -59,36 +59,23 @@ export async function submitManualDeal(payload: ManualSubmissionPayload) {
 
   store.addProduct(product);
 
-  // Add initial price point
+  // Add ONLY the real submitted price point — NO fake history
   store.addPricePoint(productId, {
     timestamp: now,
     price: payload.currentPrice,
     effectivePrice: payload.currentPrice,
   });
 
-  // Build simulated baseline history if none exists to allow rarity comparison
-  const simulatedMedian = payload.mrp * 0.85;
-  for (let i = 15; i >= 1; i--) {
-    const historicalTs = new Date(Date.now() - i * 24 * 3600 * 1000).toISOString();
-    const variation = (Math.random() - 0.5) * 0.05 * simulatedMedian;
-    const histPrice = Math.round((simulatedMedian + variation) / 10) * 10 - 1;
-    store.addPricePoint(productId, {
-      timestamp: historicalTs,
-      price: histPrice,
-      effectivePrice: histPrice,
-    });
-  }
-
-  // Create price event
+  // Create price event using MRP as the baseline (since we have no history)
   const priceEvent: PriceEvent = {
     id: uuid(),
     productId,
     price: payload.currentPrice,
     mrp: payload.mrp,
     effectivePrice: payload.currentPrice,
-    previousPrice: simulatedMedian,
-    priceChange: payload.currentPrice - simulatedMedian,
-    priceChangePct: ((payload.currentPrice - simulatedMedian) / simulatedMedian) * 100,
+    previousPrice: payload.mrp,
+    priceChange: payload.currentPrice - payload.mrp,
+    priceChangePct: ((payload.currentPrice - payload.mrp) / payload.mrp) * 100,
     sourceTimestamp: now,
     ingestedAt: now,
     platform,

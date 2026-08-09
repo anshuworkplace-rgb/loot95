@@ -31,6 +31,7 @@ class Store {
   private priceStats = new Map<string, PriceStatistics[]>();
   private dealEvents: DealEvent[] = [];
   private alerts: Alert[] = [];
+  private recentErrors: Array<{ timestamp: string; source: string; message: string }> = [];
   private connectors = new Map<string, ConnectorInfo>();
   private metrics: SystemMetrics = {
     productsMonitored: 0,
@@ -69,8 +70,10 @@ class Store {
     }
     this.dealEvents = this.dealEvents.filter(d => !d.productId.startsWith('sim_') && !d.productId.startsWith('amz_in_sim_'));
     for (const d of this.dealEvents) {
-      if (!d.url || !d.url.startsWith('http') || d.url.includes('B09R673DBP')) {
-        d.url = `https://www.amazon.in/s?k=${encodeURIComponent(d.title)}`;
+      if (!d.product?.url || !d.product.url.startsWith('http') || d.product.url.includes('B09R673DBP')) {
+        if (d.product) {
+          d.product.url = `https://www.amazon.in/s?k=${encodeURIComponent(d.product.title)}`;
+        }
       }
     }
     this.metrics.productsMonitored = this.products.size;
@@ -290,6 +293,39 @@ class Store {
   shutdown(): void {
     if (this.saveTimer) clearInterval(this.saveTimer);
     this.save();
+  }
+
+  // ─── Error Tracking ───────────────────────────────────────
+
+  addError(source: string, message: string): void {
+    this.recentErrors.unshift({
+      timestamp: new Date().toISOString(),
+      source,
+      message,
+    });
+    if (this.recentErrors.length > 50) this.recentErrors.length = 50;
+  }
+
+  getRecentErrors(): Array<{ timestamp: string; source: string; message: string }> {
+    return this.recentErrors.slice(0, 20);
+  }
+
+  // ─── Store Diagnostics ────────────────────────────────────
+
+  getStoreDiagnostics() {
+    let priceHistoryEntries = 0;
+    for (const [, history] of this.priceHistory) {
+      priceHistoryEntries += history.length;
+    }
+
+    return {
+      productCount: this.products.size,
+      dealEventCount: this.dealEvents.length,
+      activeDealCount: this.dealEvents.filter(d => d.isActive).length,
+      priceHistoryEntries,
+      alertCount: this.alerts.length,
+      connectorCount: this.connectors.size,
+    };
   }
 }
 

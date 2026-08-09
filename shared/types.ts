@@ -5,7 +5,7 @@
 
 // ─── Platform & Enums ─────────────────────────────────────────
 
-export type Platform = 'amazon' | 'flipkart' | 'myntra' | 'croma' | 'ajio' | 'nykaa' | 'simulator';
+export type Platform = 'amazon' | 'flipkart' | 'myntra' | 'croma' | 'ajio' | 'nykaa';
 
 export type DealClassification = 'NORMAL' | 'GREAT' | 'HOT' | 'EXTREME' | 'LOOT_95' | 'PRICE_ERROR';
 
@@ -19,7 +19,7 @@ export type AIVerdict =
 
 export type AlertPriority = 'CRITICAL' | 'HIGH' | 'NORMAL';
 
-export type ConnectorStatus = 'ONLINE' | 'DEGRADED' | 'OFFLINE' | 'ERROR';
+export type ConnectorStatus = 'ONLINE' | 'DEGRADED' | 'OFFLINE' | 'ERROR' | 'STANDBY';
 
 // ─── Product ──────────────────────────────────────────────────
 
@@ -295,3 +295,34 @@ export const DEFAULT_SCORING_CONFIG: ScoringConfig = {
   minimumConfidence: 0.3,
   minimumSampleCount: 5,
 };
+
+// ─── Diagnostics Report ───────────────────────────────────────
+
+export interface DiagnosticsSubsystem {
+  name: string;
+  status: 'OK' | 'WARNING' | 'ERROR' | 'UNCONFIGURED';
+  message: string;
+  lastChecked: string;
+  details?: Record<string, unknown>;
+}
+
+export interface DiagnosticsReport {
+  timestamp: string;
+  overallStatus: 'HEALTHY' | 'DEGRADED' | 'CRITICAL';
+  subsystems: DiagnosticsSubsystem[];
+  recentErrors: Array<{ timestamp: string; source: string; message: string }>;
+  storeHealth: {
+    productCount: number;
+    dealEventCount: number;
+    activeDealCount: number;
+    priceHistoryEntries: number;
+    alertCount: number;
+  };
+  performance: {
+    uptimeHours: number;
+    avgProcessingLatencyMs: number;
+    eventsPerMinute: number;
+    sseClientCount: number;
+    memoryUsageMB: number;
+  };
+}

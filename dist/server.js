@@ -1,7 +1,5 @@
 var __defProp = Object.defineProperty;
-var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
 var __getOwnPropNames = Object.getOwnPropertyNames;
-var __hasOwnProp = Object.prototype.hasOwnProperty;
 var __esm = (fn, res, err) => function __init() {
   if (err) throw err[0];
   try {
@@ -14,15 +12,6 @@ var __export = (target, all) => {
   for (var name in all)
     __defProp(target, name, { get: all[name], enumerable: true });
 };
-var __copyProps = (to, from, except, desc) => {
-  if (from && typeof from === "object" || typeof from === "function") {
-    for (let key of __getOwnPropNames(from))
-      if (!__hasOwnProp.call(to, key) && key !== except)
-        __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
-  }
-  return to;
-};
-var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 
 // server/store.ts
 import * as fs from "fs";
@@ -38,6 +27,7 @@ var init_store = __esm({
       priceStats = /* @__PURE__ */ new Map();
       dealEvents = [];
       alerts = [];
+      recentErrors = [];
       connectors = /* @__PURE__ */ new Map();
       metrics = {
         productsMonitored: 0,
@@ -73,8 +63,10 @@ var init_store = __esm({
         }
         this.dealEvents = this.dealEvents.filter((d) => !d.productId.startsWith("sim_") && !d.productId.startsWith("amz_in_sim_"));
         for (const d of this.dealEvents) {
-          if (!d.url || !d.url.startsWith("http") || d.url.includes("B09R673DBP")) {
-            d.url = `https://www.amazon.in/s?k=${encodeURIComponent(d.title)}`;
+          if (!d.product?.url || !d.product.url.startsWith("http") || d.product.url.includes("B09R673DBP")) {
+            if (d.product) {
+              d.product.url = `https://www.amazon.in/s?k=${encodeURIComponent(d.product.title)}`;
+            }
           }
         }
         this.metrics.productsMonitored = this.products.size;
@@ -246,6 +238,33 @@ var init_store = __esm({
       shutdown() {
         if (this.saveTimer) clearInterval(this.saveTimer);
         this.save();
+      }
+      // ─── Error Tracking ───────────────────────────────────────
+      addError(source, message) {
+        this.recentErrors.unshift({
+          timestamp: (/* @__PURE__ */ new Date()).toISOString(),
+          source,
+          message
+        });
+        if (this.recentErrors.length > 50) this.recentErrors.length = 50;
+      }
+      getRecentErrors() {
+        return this.recentErrors.slice(0, 20);
+      }
+      // ─── Store Diagnostics ────────────────────────────────────
+      getStoreDiagnostics() {
+        let priceHistoryEntries = 0;
+        for (const [, history] of this.priceHistory) {
+          priceHistoryEntries += history.length;
+        }
+        return {
+          productCount: this.products.size,
+          dealEventCount: this.dealEvents.length,
+          activeDealCount: this.dealEvents.filter((d) => d.isActive).length,
+          priceHistoryEntries,
+          alertCount: this.alerts.length,
+          connectorCount: this.connectors.size
+        };
       }
     };
     store = new Store();
@@ -662,7 +681,7 @@ async function sendLoot95EmailAlert(deal, recipientEmail) {
     console.log("[Email Alert Service] No target email configured.");
     return false;
   }
-  const { product, currentPrice, normalPrice, realDiscountPct, lootScore, classification, aiJudge } = deal;
+  const { product, currentPrice, normalPrice, realDiscountPct, lootScore, classification, aiReasoning } = deal;
   const subject = `\u{1F6A8} LOOT 95 ALERT [Score: ${lootScore}]: ${product.title.substring(0, 45)} (\u20B9${currentPrice.toLocaleString("en-IN")}) \u2014 ${realDiscountPct}% REAL OFF!`;
   const htmlContent = `
 <!DOCTYPE html>
@@ -711,7 +730,7 @@ async function sendLoot95EmailAlert(deal, recipientEmail) {
       </div>
 
       <p style="color:#d1d5db; font-size:14px; line-height:1.5;">
-        <strong>AI Deal Audit:</strong> ${aiJudge?.reasoning || "Verified genuine price drop below 30-day historical median."}
+        <strong>AI Deal Audit:</strong> ${aiReasoning || "Verified genuine price drop below 30-day historical median."}
       </p>
 
       <a href="${product.url}" class="cta-button" target="_blank">\u26A1 GRAB DEAL NOW ON AMAZON \u2192</a>
@@ -1036,10 +1055,10 @@ var manual_exports = {};
 __export(manual_exports, {
   submitManualDeal: () => submitManualDeal
 });
-import { v4 as uuid4 } from "uuid";
+import { v4 as uuid3 } from "uuid";
 async function submitManualDeal(payload) {
   const platform = payload.platform || (payload.url.includes("flipkart") ? "flipkart" : "amazon");
-  const productId = `manual_${platform}_${uuid4().substring(0, 8)}`;
+  const productId = `manual_${platform}_${uuid3().substring(0, 8)}`;
   const now = (/* @__PURE__ */ new Date()).toISOString();
   const product = {
     id: productId,
@@ -1073,26 +1092,15 @@ async function submitManualDeal(payload) {
     price: payload.currentPrice,
     effectivePrice: payload.currentPrice
   });
-  const simulatedMedian = payload.mrp * 0.85;
-  for (let i = 15; i >= 1; i--) {
-    const historicalTs = new Date(Date.now() - i * 24 * 3600 * 1e3).toISOString();
-    const variation = (Math.random() - 0.5) * 0.05 * simulatedMedian;
-    const histPrice = Math.round((simulatedMedian + variation) / 10) * 10 - 1;
-    store.addPricePoint(productId, {
-      timestamp: historicalTs,
-      price: histPrice,
-      effectivePrice: histPrice
-    });
-  }
   const priceEvent = {
-    id: uuid4(),
+    id: uuid3(),
     productId,
     price: payload.currentPrice,
     mrp: payload.mrp,
     effectivePrice: payload.currentPrice,
-    previousPrice: simulatedMedian,
-    priceChange: payload.currentPrice - simulatedMedian,
-    priceChangePct: (payload.currentPrice - simulatedMedian) / simulatedMedian * 100,
+    previousPrice: payload.mrp,
+    priceChange: payload.currentPrice - payload.mrp,
+    priceChangePct: (payload.currentPrice - payload.mrp) / payload.mrp * 100,
     sourceTimestamp: now,
     ingestedAt: now,
     platform
@@ -1115,23 +1123,10 @@ import express from "express";
 import cors from "cors";
 import path2 from "path";
 
-// server/connectors/simulator.ts
-init_store();
-init_pipeline();
-import { v4 as uuid2 } from "uuid";
-function initializeSimulator() {
-  console.log("[Simulator] Fake simulation completely disabled. Operating strictly in 100% REAL AMAZON INDIA API mode.");
-}
-function startSimulation() {
-}
-function stopSimulation() {
-}
-
 // server/connectors/rapidapi.ts
 init_store();
 init_pipeline();
-import { v4 as uuid3 } from "uuid";
-var RAPIDAPI_KEY2 = process.env.RAPIDAPI_KEY || "c1ff680d50msh57a77dea7bbca31p133f8ejsnaf685241d8df";
+import { v4 as uuid2 } from "uuid";
 var RAPIDAPI_HOST = process.env.RAPIDAPI_HOST || "real-time-amazon-data.p.rapidapi.com";
 var ELECTRONICS_QUERIES = [
   "deals of the day",
@@ -1145,8 +1140,28 @@ var ELECTRONICS_QUERIES = [
   "best offers",
   "great Indian sale deals"
 ];
+var lastApiError = null;
+var lastApiErrorAt = null;
+var totalApiCalls = 0;
+var totalApiFailures = 0;
+var lastSuccessfulQuery = null;
+function getRapidApiDiagnostics() {
+  return {
+    totalApiCalls,
+    totalApiFailures,
+    lastApiError,
+    lastApiErrorAt,
+    lastSuccessfulQuery,
+    apiKeyConfigured: !!getApiKey(),
+    apiKeyPrefix: getApiKey() ? getApiKey().substring(0, 8) + "..." : null
+  };
+}
+function getApiKey() {
+  const key = process.env.RAPIDAPI_KEY || null;
+  return key || null;
+}
 async function fetchRealAmazonDeals(query = "deals of the day") {
-  const currentKey = process.env.RAPIDAPI_KEY || RAPIDAPI_KEY2;
+  const currentKey = getApiKey();
   if (!currentKey) {
     store.setConnectorStatus({
       platform: "amazon",
@@ -1155,11 +1170,13 @@ async function fetchRealAmazonDeals(query = "deals of the day") {
       lastErrorAt: null,
       errorMessage: "Set RAPIDAPI_KEY in .env for live Amazon India API fetches",
       eventsProcessed: store.getMetrics().priceEventsProcessed || 0,
-      avgLatencyMs: 2
+      avgLatencyMs: 0
     });
     return [];
   }
   console.log(`[RapidAPI Connector] Fetching live real-time Amazon.in data for query: "${query}"...`);
+  totalApiCalls++;
+  const apiStartTime = Date.now();
   try {
     const url = `https://${RAPIDAPI_HOST}/search?query=${encodeURIComponent(query)}&country=IN`;
     const res = await fetch(url, {
@@ -1186,7 +1203,9 @@ async function fetchRealAmazonDeals(query = "deals of the day") {
       console.log(`[RapidAPI Connector] No deals returned for query "${query}"`);
       return [];
     }
-    console.log(`[RapidAPI Connector] Successfully fetched ${items.length} live Amazon India items for query "${query}"`);
+    const realLatencyMs = Date.now() - apiStartTime;
+    console.log(`[RapidAPI Connector] Successfully fetched ${items.length} live Amazon India items for query "${query}" (${realLatencyMs}ms)`);
+    lastSuccessfulQuery = query;
     const now = (/* @__PURE__ */ new Date()).toISOString();
     const processedDeals = [];
     for (const item of items) {
@@ -1196,21 +1215,24 @@ async function fetchRealAmazonDeals(query = "deals of the day") {
       if (!numPrice || isNaN(numPrice)) continue;
       const rawPriceStr = item.product_original_price || item.original_price || item.list_price;
       const mrp = rawPriceStr ? typeof rawPriceStr === "number" ? rawPriceStr : parseFloat(String(rawPriceStr).replace(/[^0-9.]/g, "")) : numPrice;
-      const asin = item.asin || item.product_asin || uuid3().slice(0, 8);
+      const asin = item.asin || item.product_asin || uuid2().slice(0, 8);
       const productId = `amz_in_${asin}`;
       const title = item.product_title || item.title || "Amazon India Deal";
+      const brand = extractBrand(title);
       const rawUrl = item.product_url || item.url || item.detail_url;
       const url2 = rawUrl && typeof rawUrl === "string" && rawUrl.startsWith("http") ? rawUrl : `https://www.amazon.in/s?k=${encodeURIComponent(title)}`;
       const imageUrl = item.product_photo || item.image || item.photo || "";
       const rating = item.product_star_rating ? parseFloat(String(item.product_star_rating)) : 4;
       const reviewCount = item.product_num_ratings ? parseInt(String(item.product_num_ratings), 10) : 100;
+      const existingProduct = store.getProduct(productId);
+      const previousPrice = existingProduct?.currentPrice || mrp;
       const product = {
         id: productId,
         brand,
         model: title.split(" ").slice(1, 4).join(" ") || "Product",
         title,
-        category: "Electronics",
-        subcategory: "Deals",
+        category: categorizeProduct(title, brand),
+        subcategory: subcategorizeProduct(title, brand),
         platform: "amazon",
         platformProductId: asin,
         url: url2,
@@ -1227,23 +1249,25 @@ async function fetchRealAmazonDeals(query = "deals of the day") {
         bankOfferRequired: false,
         specifications: {},
         lastCheckedAt: now,
-        createdAt: now,
+        createdAt: existingProduct?.createdAt || now,
         updatedAt: now
       };
       store.addProduct(product);
-      const priceEvent = {
-        id: uuid3(),
-        productId,
+      store.addPricePoint(productId, {
         timestamp: now,
-        rawPrice: product.mrp,
-        sellingPrice: numPrice,
+        price: numPrice,
+        effectivePrice: numPrice
+      });
+      const priceEvent = {
+        id: uuid2(),
+        productId,
+        price: numPrice,
+        mrp: product.mrp,
         effectivePrice: numPrice,
-        sellerName: "Amazon Verified Seller",
-        sellerRating: 4.5,
-        stockStatus: "in_stock",
-        couponAmount: 0,
-        bankOfferAmount: 0,
-        confidenceScore: 0.99,
+        previousPrice,
+        priceChange: numPrice - previousPrice,
+        priceChangePct: previousPrice ? (numPrice - previousPrice) / previousPrice * 100 : 0,
+        sourceTimestamp: now,
         ingestedAt: now,
         platform: "amazon"
       };
@@ -1260,37 +1284,89 @@ async function fetchRealAmazonDeals(query = "deals of the day") {
       lastErrorAt: null,
       errorMessage: null,
       eventsProcessed: prevProcessed + items.length,
-      avgLatencyMs: 320
+      avgLatencyMs: realLatencyMs
     });
     return processedDeals;
   } catch (error) {
+    totalApiFailures++;
+    lastApiError = error.message;
+    lastApiErrorAt = (/* @__PURE__ */ new Date()).toISOString();
     console.error("[RapidAPI Connector] Error fetching Amazon India data:", error.message);
-    const prevProcessed = store.getConnectorStatuses().find((c) => c.platform === "amazon")?.eventsProcessed || 0;
+    const prevStatus = store.getConnectorStatuses().find((c) => c.platform === "amazon");
     store.setConnectorStatus({
       platform: "amazon",
-      status: "ONLINE",
-      lastSuccessAt: (/* @__PURE__ */ new Date()).toISOString(),
+      status: "ERROR",
+      lastSuccessAt: prevStatus?.lastSuccessAt || null,
       lastErrorAt: (/* @__PURE__ */ new Date()).toISOString(),
       errorMessage: error.message,
-      eventsProcessed: prevProcessed,
-      avgLatencyMs: 320
+      eventsProcessed: prevStatus?.eventsProcessed || 0,
+      avgLatencyMs: prevStatus?.avgLatencyMs || 0
     });
     return [];
   }
 }
+function extractBrand(title) {
+  const words = title.split(" ");
+  return words[0] || "Generic";
+}
+function categorizeProduct(title, _brand) {
+  const t = title.toLowerCase();
+  if (t.includes("laptop") || t.includes("notebook") || t.includes("macbook") || t.includes("chromebook")) return "Computers";
+  if (t.includes("phone") || t.includes("iphone") || t.includes("galaxy s") || t.includes("pixel") || t.includes("oneplus") || t.includes("redmi") || t.includes("realme")) return "Smartphones";
+  if (t.includes("tablet") || t.includes("ipad")) return "Tablets";
+  if (t.includes("headphone") || t.includes("earphone") || t.includes("earbud") || t.includes("airpod") || t.includes("speaker") || t.includes("soundbar")) return "Audio";
+  if (t.includes("tv") || t.includes("television") || t.includes("monitor")) return "Displays";
+  if (t.includes("watch") || t.includes("band") || t.includes("tracker")) return "Wearables";
+  if (t.includes("camera") || t.includes("gopro") || t.includes("lens")) return "Cameras";
+  if (t.includes("playstation") || t.includes("xbox") || t.includes("nintendo") || t.includes("gaming") || t.includes("controller")) return "Gaming";
+  if (t.includes("vacuum") || t.includes("purifier") || t.includes("washing") || t.includes("refrigerator") || t.includes("microwave") || t.includes("oven")) return "Appliances";
+  return "Electronics";
+}
+function subcategorizeProduct(title, _brand) {
+  const t = title.toLowerCase();
+  if (t.includes("laptop") || t.includes("notebook") || t.includes("macbook") || t.includes("chromebook")) return "Laptops";
+  if (t.includes("phone") || t.includes("iphone") || t.includes("galaxy s") || t.includes("pixel") || t.includes("oneplus") || t.includes("redmi") || t.includes("realme")) return "Smartphones";
+  if (t.includes("tablet") || t.includes("ipad")) return "Tablets";
+  if (t.includes("headphone") || t.includes("over-ear") || t.includes("on-ear")) return "Headphones";
+  if (t.includes("earbud") || t.includes("airpod") || t.includes("earphone") || t.includes("in-ear") || t.includes("tws")) return "Earbuds";
+  if (t.includes("speaker") || t.includes("soundbar") || t.includes("subwoofer")) return "Speakers";
+  if (t.includes("smart tv") || t.includes("television") || t.includes("led tv") || t.includes("oled") || t.includes("qled") || t.includes("4k tv")) return "TVs";
+  if (t.includes("monitor") || t.includes("display")) return "Monitors";
+  if (t.includes("smartwatch") || t.includes("smart watch") || t.includes("apple watch") || t.includes("galaxy watch")) return "Smartwatches";
+  if (t.includes("fitness band") || t.includes("fitness tracker")) return "Fitness Trackers";
+  if (t.includes("camera") || t.includes("gopro") || t.includes("dslr") || t.includes("mirrorless")) return "Cameras";
+  if (t.includes("playstation") || t.includes("ps5") || t.includes("ps4")) return "Gaming";
+  if (t.includes("xbox")) return "Gaming";
+  if (t.includes("nintendo") || t.includes("switch")) return "Gaming";
+  if (t.includes("vacuum")) return "Appliances";
+  if (t.includes("purifier")) return "Appliances";
+  return "Deals";
+}
 var pollTimer = null;
 function startRealAmazonPolling(intervalMs = 2e4) {
-  const currentKey = process.env.RAPIDAPI_KEY || RAPIDAPI_KEY2;
-  if (!currentKey) return;
+  const currentKey = getApiKey();
+  if (!currentKey) {
+    console.warn("[RapidAPI Connector] RAPIDAPI_KEY not configured. Polling NOT started.");
+    store.setConnectorStatus({
+      platform: "amazon",
+      status: "STANDBY",
+      lastSuccessAt: null,
+      lastErrorAt: null,
+      errorMessage: "RAPIDAPI_KEY not configured in environment",
+      eventsProcessed: 0,
+      avgLatencyMs: 0
+    });
+    return;
+  }
   console.log(`[RapidAPI Connector] Starting 100% REAL Amazon India deal polling (interval: ${intervalMs / 1e3}s)`);
   store.setConnectorStatus({
     platform: "amazon",
     status: "ONLINE",
-    lastSuccessAt: (/* @__PURE__ */ new Date()).toISOString(),
+    lastSuccessAt: null,
     lastErrorAt: null,
     errorMessage: null,
     eventsProcessed: store.getMetrics().priceEventsProcessed || 0,
-    avgLatencyMs: 320
+    avgLatencyMs: 0
   });
   let queryIndex = 0;
   const poll = async () => {
@@ -1456,6 +1532,7 @@ app.post("/api/deals/submit", async (req, res) => {
       timestamp: (/* @__PURE__ */ new Date()).toISOString()
     });
   } catch (e) {
+    store.addError("ManualSubmit", e.message || "Failed to submit deal");
     res.status(400).json({
       success: false,
       error: e.message || "Failed to submit deal",
@@ -1471,13 +1548,13 @@ app.get("/api/metrics", (_req, res) => {
     timestamp: (/* @__PURE__ */ new Date()).toISOString()
   });
 });
-app.post("/api/settings/email", (req, res) => {
+app.post("/api/settings/email", async (req, res) => {
   const { email } = req.body;
   if (!email || !email.includes("@")) {
     res.status(400).json({ success: false, error: "Invalid email address" });
     return;
   }
-  const { setRecipientEmail: setRecipientEmail2 } = (init_email(), __toCommonJS(email_exports));
+  const { setRecipientEmail: setRecipientEmail2 } = await Promise.resolve().then(() => (init_email(), email_exports));
   setRecipientEmail2(email);
   res.json({ success: true, message: `Alert email set to ${email}`, email });
 });
@@ -1515,6 +1592,98 @@ app.post("/api/test/email", async (req, res) => {
     res.status(500).json({ success: false, error: e.message });
   }
 });
+app.get("/api/diagnostics", (_req, res) => {
+  const now = (/* @__PURE__ */ new Date()).toISOString();
+  const metrics = store.getMetrics();
+  const connectors = store.getConnectorStatuses();
+  const storeDiag = store.getStoreDiagnostics();
+  const rapidApiDiag = getRapidApiDiagnostics();
+  const recentErrors = store.getRecentErrors();
+  const subsystems = [];
+  const amazonConnector = connectors.find((c) => c.platform === "amazon");
+  subsystems.push({
+    name: "RapidAPI Amazon India Connector",
+    status: !rapidApiDiag.apiKeyConfigured ? "UNCONFIGURED" : amazonConnector?.status === "ONLINE" ? "OK" : amazonConnector?.status === "ERROR" ? "ERROR" : "WARNING",
+    message: !rapidApiDiag.apiKeyConfigured ? "RAPIDAPI_KEY not set in environment variables" : amazonConnector?.status === "ONLINE" ? `Connected. ${amazonConnector.eventsProcessed} events processed. Last success: ${amazonConnector.lastSuccessAt || "N/A"}` : amazonConnector?.errorMessage || "Status unknown",
+    lastChecked: now,
+    details: {
+      ...rapidApiDiag,
+      connectorStatus: amazonConnector?.status || "NOT_INITIALIZED",
+      lastSuccessAt: amazonConnector?.lastSuccessAt,
+      lastErrorAt: amazonConnector?.lastErrorAt,
+      eventsProcessed: amazonConnector?.eventsProcessed || 0,
+      avgLatencyMs: amazonConnector?.avgLatencyMs || 0
+    }
+  });
+  const geminiKey = process.env.GEMINI_API_KEY;
+  subsystems.push({
+    name: "Gemini AI Deal Judge",
+    status: geminiKey ? "OK" : "UNCONFIGURED",
+    message: geminiKey ? `API key configured (${geminiKey.substring(0, 8)}...). AI verdicts active.` : "GEMINI_API_KEY not set. Using rule-based fallback judge.",
+    lastChecked: now,
+    details: {
+      keyConfigured: !!geminiKey,
+      model: "gemini-2.0-flash",
+      fallback: !geminiKey ? "Rule-based judge active" : null
+    }
+  });
+  const smtpUser = process.env.SMTP_USER;
+  const smtpPass = process.env.SMTP_PASS;
+  subsystems.push({
+    name: "Email Alert Service",
+    status: smtpUser && smtpPass ? "OK" : "UNCONFIGURED",
+    message: smtpUser && smtpPass ? `SMTP configured with ${smtpUser}. Email alerts active.` : "SMTP_USER/SMTP_PASS not set. Alerts logged to console only.",
+    lastChecked: now,
+    details: {
+      smtpConfigured: !!(smtpUser && smtpPass),
+      smtpHost: process.env.SMTP_HOST || "smtp.gmail.com"
+    }
+  });
+  subsystems.push({
+    name: "SSE Real-time Push",
+    status: sseClients.size > 0 ? "OK" : "WARNING",
+    message: sseClients.size > 0 ? `${sseClients.size} active client(s) receiving real-time events.` : "No SSE clients connected. UI may not be receiving live updates.",
+    lastChecked: now,
+    details: { clientCount: sseClients.size }
+  });
+  subsystems.push({
+    name: "In-Memory Data Store",
+    status: storeDiag.productCount >= 0 ? "OK" : "ERROR",
+    message: `${storeDiag.productCount} products, ${storeDiag.dealEventCount} deals (${storeDiag.activeDealCount} active), ${storeDiag.priceHistoryEntries} price points tracked.`,
+    lastChecked: now,
+    details: storeDiag
+  });
+  const hasError = subsystems.some((s) => s.status === "ERROR");
+  const hasWarning = subsystems.some((s) => s.status === "WARNING" || s.status === "UNCONFIGURED");
+  const overallStatus = hasError ? "CRITICAL" : hasWarning ? "DEGRADED" : "HEALTHY";
+  const memUsage = process.memoryUsage();
+  const uptimeMs = Date.now() - new Date(metrics.uptimeHours ? Date.now() - metrics.uptimeHours * 36e5 : Date.now()).getTime();
+  const eventsPerMinute = metrics.uptimeHours > 0 ? Math.round(metrics.priceEventsProcessed / (metrics.uptimeHours * 60) * 10) / 10 : 0;
+  res.json({
+    success: true,
+    data: {
+      timestamp: now,
+      overallStatus,
+      subsystems,
+      recentErrors,
+      storeHealth: {
+        productCount: storeDiag.productCount,
+        dealEventCount: storeDiag.dealEventCount,
+        activeDealCount: storeDiag.activeDealCount,
+        priceHistoryEntries: storeDiag.priceHistoryEntries,
+        alertCount: storeDiag.alertCount
+      },
+      performance: {
+        uptimeHours: metrics.uptimeHours,
+        avgProcessingLatencyMs: metrics.avgProcessingLatencyMs,
+        eventsPerMinute,
+        sseClientCount: sseClients.size,
+        memoryUsageMB: Math.round(memUsage.heapUsed / 1024 / 1024 * 10) / 10
+      }
+    },
+    timestamp: now
+  });
+});
 var distPath = path2.join(process.cwd(), "dist");
 app.use(express.static(distPath));
 app.use((req, res, next) => {
@@ -1533,34 +1702,25 @@ app.listen(PORT, () => {
   console.log("\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550");
   console.log("  \u{1F3AF} LOOT 95 \u2014 Deal Intelligence Engine");
   console.log("  \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500");
-  console.log(`  API Server:    http://localhost:${PORT}`);
-  console.log(`  SSE Endpoint:  http://localhost:${PORT}/api/events`);
-  console.log("  Status:        ONLINE");
-  console.log("  Mode:          SIMULATION (realistic electronics data)");
+  console.log(`  API Server:     http://localhost:${PORT}`);
+  console.log(`  SSE Endpoint:   http://localhost:${PORT}/api/events`);
+  console.log(`  Diagnostics:    http://localhost:${PORT}/api/diagnostics`);
+  console.log("  Status:         ONLINE");
+  console.log("  Mode:           100% REAL AMAZON INDIA DATA");
   console.log("\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550");
   console.log("");
-  const hasRealKeys = !!(process.env.RAPIDAPI_KEY || RAPIDAPI_KEY);
-  if (hasRealKeys) {
-    console.log("[Server] 100% REAL DATA MODE ACTIVE \u2014 Disabling simulation & purging synthetic data.");
-    stopSimulation();
-    store.purgeSimulatedData();
-    startRealAmazonPolling(2e4);
-  } else {
-    console.log("[Server] SIMULATION MODE ACTIVE \u2014 Set RAPIDAPI_KEY in .env for live Amazon India deals.");
-    initializeSimulator();
-    startSimulation(3e3);
-  }
+  store.purgeSimulatedData();
+  console.log("[Server] Starting 100% REAL DATA MODE \u2014 Amazon India API connector.");
+  startRealAmazonPolling(2e4);
   setInterval(() => broadcastStatus(), 5e3);
 });
 process.on("SIGINT", () => {
   console.log("\n[Server] Shutting down...");
-  stopSimulation();
   stopRealAmazonPolling();
   store.shutdown();
   process.exit(0);
 });
 process.on("SIGTERM", () => {
-  stopSimulation();
   stopRealAmazonPolling();
   store.shutdown();
   process.exit(0);

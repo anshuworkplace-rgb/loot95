@@ -421,56 +421,260 @@ const PreferencesView: React.FC = () => {
   );
 };
 
-// ─── Admin Ops View Component ─────────────────────────────────
+// ─── System Operations & Diagnostics Dashboard ───────────────
 
 const AdminView: React.FC<{ status: any }> = ({ status }) => {
+  const [diagnostics, setDiagnostics] = React.useState<any>(null);
+  const [diagLoading, setDiagLoading] = React.useState(true);
+  const [diagError, setDiagError] = React.useState<string | null>(null);
+  const [lastRefresh, setLastRefresh] = React.useState<string>('');
+
+  const fetchDiagnostics = React.useCallback(async () => {
+    try {
+      setDiagLoading(true);
+      setDiagError(null);
+      const API_BASE = import.meta.env.DEV ? 'http://localhost:3001' : '';
+      const res = await fetch(`${API_BASE}/api/diagnostics`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+      const json = await res.json();
+      setDiagnostics(json.data);
+      setLastRefresh(new Date().toLocaleTimeString());
+    } catch (e: any) {
+      setDiagError(e.message || 'Failed to fetch diagnostics');
+    } finally {
+      setDiagLoading(false);
+    }
+  }, []);
+
+  React.useEffect(() => {
+    fetchDiagnostics();
+    const interval = setInterval(fetchDiagnostics, 10000); // Auto-refresh every 10s
+    return () => clearInterval(interval);
+  }, [fetchDiagnostics]);
+
+  const statusColor = (s: string) => {
+    switch (s) {
+      case 'OK': case 'ONLINE': case 'HEALTHY': return 'var(--status-online)';
+      case 'WARNING': case 'DEGRADED': case 'STANDBY': return 'var(--accent-orange)';
+      case 'ERROR': case 'CRITICAL': return '#ef4444';
+      case 'UNCONFIGURED': return 'var(--accent-cyan)';
+      default: return 'var(--text-muted)';
+    }
+  };
+
+  const statusIcon = (s: string) => {
+    switch (s) {
+      case 'OK': case 'ONLINE': case 'HEALTHY': return '●';
+      case 'WARNING': case 'DEGRADED': case 'STANDBY': return '◐';
+      case 'ERROR': case 'CRITICAL': return '✖';
+      case 'UNCONFIGURED': return '○';
+      default: return '?';
+    }
+  };
+
   return (
-    <div style={{ padding: '32px', maxWidth: '900px' }}>
-      <h2 style={{ fontSize: '1.2rem', marginBottom: '16px' }}>SYSTEM OPERATIONS & TELEMETRY</h2>
+    <div style={{ padding: '24px 32px', maxWidth: '1000px', fontFamily: 'var(--font-mono)' }}>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px', marginBottom: '24px' }}>
-        <div style={{ background: 'var(--bg-surface)', padding: '20px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)' }}>
-          <h4 style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '8px' }}>INGESTION & PIPELINE LATENCY</h4>
-          <div style={{ fontSize: '1.8rem', fontFamily: 'var(--font-mono)', fontWeight: 800, color: 'var(--loot-green)' }}>
-            {status?.metrics.avgProcessingLatencyMs || 12} ms
-          </div>
-          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Source-to-Scoring Pipeline Duration</span>
+      {/* Header */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+        <div>
+          <h2 style={{ fontSize: '1.2rem', fontWeight: 800, letterSpacing: '1px' }}>SYSTEM OPERATIONS & DIAGNOSTICS</h2>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.75rem', marginTop: '4px' }}>
+            Real-time health monitoring for all subsystems. Auto-refreshes every 10s.
+            {lastRefresh && <span> • Last: {lastRefresh}</span>}
+          </p>
         </div>
-
-        <div style={{ background: 'var(--bg-surface)', padding: '20px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)' }}>
-          <h4 style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '8px' }}>UPTIME & HEALTH</h4>
-          <div style={{ fontSize: '1.8rem', fontFamily: 'var(--font-mono)', fontWeight: 800, color: 'var(--accent-blue)' }}>
-            {status?.metrics.uptimeHours || 0.1} hours
-          </div>
-          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Continuous 24/7 Engine Monitoring</span>
-        </div>
+        <button
+          onClick={fetchDiagnostics}
+          style={{
+            padding: '8px 16px', background: 'rgba(16,185,129,0.15)', color: 'var(--loot-green)',
+            border: '1px solid rgba(16,185,129,0.4)', borderRadius: 'var(--radius-sm)',
+            cursor: 'pointer', fontWeight: 700, fontSize: '0.75rem', fontFamily: 'var(--font-mono)',
+          }}
+        >
+          🔄 REFRESH NOW
+        </button>
       </div>
 
-      <h3 style={{ fontSize: '0.9rem', marginBottom: '12px', color: 'var(--text-secondary)' }}>CONNECTOR HEALTH</h3>
-      <div style={{ background: 'var(--bg-surface)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)', overflow: 'hidden' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.85rem' }}>
-          <thead>
-            <tr style={{ background: 'var(--bg-deep)', color: 'var(--text-muted)' }}>
-              <th style={{ padding: '12px 16px' }}>Platform Connector</th>
-              <th style={{ padding: '12px 16px' }}>Status</th>
-              <th style={{ padding: '12px 16px' }}>Events Processed</th>
-              <th style={{ padding: '12px 16px' }}>Mode</th>
-            </tr>
-          </thead>
-          <tbody>
-            {status?.connectors?.map((conn: any) => (
-              <tr key={conn.platform} style={{ borderTop: '1px solid var(--border-subtle)' }}>
-                <td style={{ padding: '12px 16px', fontWeight: 600 }}>{conn.platform.toUpperCase()}</td>
-                <td style={{ padding: '12px 16px', color: conn.status === 'ONLINE' ? 'var(--status-online)' : 'var(--accent-orange)' }}>● {conn.status}</td>
-                <td style={{ padding: '12px 16px', fontFamily: 'var(--font-mono)' }}>{conn.eventsProcessed || 0}</td>
-                <td style={{ padding: '12px 16px', color: 'var(--loot-green)', fontWeight: 700 }}>
-                  {conn.platform === 'amazon' ? '100% REAL AMAZON API' : 'SIMULATION'}
-                </td>
-              </tr>
+      {/* Error State */}
+      {diagError && (
+        <div style={{ padding: '16px', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.4)', borderRadius: 'var(--radius-md)', color: '#ef4444', fontSize: '0.85rem', marginBottom: '16px' }}>
+          ✖ DIAGNOSTICS ERROR: {diagError}
+        </div>
+      )}
+
+      {/* Loading State */}
+      {diagLoading && !diagnostics && (
+        <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>
+          Loading diagnostics...
+        </div>
+      )}
+
+      {diagnostics && (
+        <>
+          {/* Overall Status Banner */}
+          <div style={{
+            padding: '16px 20px', borderRadius: 'var(--radius-md)', marginBottom: '20px',
+            background: diagnostics.overallStatus === 'HEALTHY' ? 'rgba(16,185,129,0.1)' : diagnostics.overallStatus === 'DEGRADED' ? 'rgba(251,191,36,0.1)' : 'rgba(239,68,68,0.1)',
+            border: `1px solid ${statusColor(diagnostics.overallStatus)}`,
+            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <span style={{ fontSize: '1.4rem' }}>
+                {diagnostics.overallStatus === 'HEALTHY' ? '🟢' : diagnostics.overallStatus === 'DEGRADED' ? '🟡' : '🔴'}
+              </span>
+              <div>
+                <div style={{ fontSize: '1rem', fontWeight: 800, color: statusColor(diagnostics.overallStatus) }}>
+                  SYSTEM STATUS: {diagnostics.overallStatus}
+                </div>
+                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+                  {diagnostics.subsystems.filter((s: any) => s.status === 'OK').length}/{diagnostics.subsystems.length} subsystems operational
+                </div>
+              </div>
+            </div>
+            <div style={{ textAlign: 'right', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+              <div>Uptime: <strong style={{ color: 'var(--accent-blue)' }}>{diagnostics.performance.uptimeHours}h</strong></div>
+              <div>Memory: <strong>{diagnostics.performance.memoryUsageMB} MB</strong></div>
+            </div>
+          </div>
+
+          {/* Performance Cards */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', marginBottom: '20px' }}>
+            {[
+              { label: 'PIPELINE LATENCY', value: `${diagnostics.performance.avgProcessingLatencyMs || 0}ms`, color: 'var(--loot-green)' },
+              { label: 'EVENTS / MINUTE', value: `${diagnostics.performance.eventsPerMinute}`, color: 'var(--accent-blue)' },
+              { label: 'SSE CLIENTS', value: `${diagnostics.performance.sseClientCount}`, color: 'var(--accent-purple)' },
+              { label: 'ACTIVE DEALS', value: `${diagnostics.storeHealth.activeDealCount}`, color: 'var(--accent-orange)' },
+            ].map(card => (
+              <div key={card.label} style={{ background: 'var(--bg-surface)', padding: '16px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)' }}>
+                <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginBottom: '6px', fontWeight: 600 }}>{card.label}</div>
+                <div style={{ fontSize: '1.5rem', fontWeight: 800, color: card.color }}>{card.value}</div>
+              </div>
             ))}
-          </tbody>
-        </table>
-      </div>
+          </div>
+
+          {/* Subsystem Health Table */}
+          <h3 style={{ fontSize: '0.85rem', marginBottom: '10px', color: 'var(--text-secondary)', fontWeight: 700 }}>SUBSYSTEM HEALTH</h3>
+          <div style={{ background: 'var(--bg-surface)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)', overflow: 'hidden', marginBottom: '20px' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.8rem' }}>
+              <thead>
+                <tr style={{ background: 'var(--bg-deep)', color: 'var(--text-muted)' }}>
+                  <th style={{ padding: '10px 16px' }}>Subsystem</th>
+                  <th style={{ padding: '10px 16px' }}>Status</th>
+                  <th style={{ padding: '10px 16px' }}>Message</th>
+                </tr>
+              </thead>
+              <tbody>
+                {diagnostics.subsystems.map((sub: any, i: number) => (
+                  <tr key={i} style={{ borderTop: '1px solid var(--border-subtle)' }}>
+                    <td style={{ padding: '12px 16px', fontWeight: 600 }}>{sub.name}</td>
+                    <td style={{ padding: '12px 16px' }}>
+                      <span style={{
+                        color: statusColor(sub.status), fontWeight: 700,
+                        display: 'inline-flex', alignItems: 'center', gap: '6px',
+                      }}>
+                        {statusIcon(sub.status)} {sub.status}
+                      </span>
+                    </td>
+                    <td style={{ padding: '12px 16px', color: 'var(--text-secondary)', fontSize: '0.75rem', maxWidth: '400px', wordBreak: 'break-word' }}>
+                      {sub.message}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Connector Health Table */}
+          <h3 style={{ fontSize: '0.85rem', marginBottom: '10px', color: 'var(--text-secondary)', fontWeight: 700 }}>CONNECTOR HEALTH</h3>
+          <div style={{ background: 'var(--bg-surface)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)', overflow: 'hidden', marginBottom: '20px' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.8rem' }}>
+              <thead>
+                <tr style={{ background: 'var(--bg-deep)', color: 'var(--text-muted)' }}>
+                  <th style={{ padding: '10px 16px' }}>Platform</th>
+                  <th style={{ padding: '10px 16px' }}>Status</th>
+                  <th style={{ padding: '10px 16px' }}>Events</th>
+                  <th style={{ padding: '10px 16px' }}>Latency</th>
+                  <th style={{ padding: '10px 16px' }}>Last Success</th>
+                  <th style={{ padding: '10px 16px' }}>Last Error</th>
+                </tr>
+              </thead>
+              <tbody>
+                {status?.connectors?.length > 0 ? status.connectors.map((conn: any) => (
+                  <tr key={conn.platform} style={{ borderTop: '1px solid var(--border-subtle)' }}>
+                    <td style={{ padding: '12px 16px', fontWeight: 600, textTransform: 'uppercase' }}>{conn.platform}</td>
+                    <td style={{ padding: '12px 16px' }}>
+                      <span style={{ color: statusColor(conn.status), fontWeight: 700 }}>
+                        {statusIcon(conn.status)} {conn.status}
+                      </span>
+                    </td>
+                    <td style={{ padding: '12px 16px', fontFamily: 'var(--font-mono)' }}>{conn.eventsProcessed || 0}</td>
+                    <td style={{ padding: '12px 16px', fontFamily: 'var(--font-mono)' }}>{conn.avgLatencyMs || 0}ms</td>
+                    <td style={{ padding: '12px 16px', fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                      {conn.lastSuccessAt ? new Date(conn.lastSuccessAt).toLocaleString() : '—'}
+                    </td>
+                    <td style={{ padding: '12px 16px', fontSize: '0.72rem', color: conn.lastErrorAt ? '#ef4444' : 'var(--text-muted)' }}>
+                      {conn.lastErrorAt ? new Date(conn.lastErrorAt).toLocaleString() : '—'}
+                      {conn.errorMessage && <div style={{ marginTop: '2px', color: '#ef4444', fontSize: '0.68rem' }}>{conn.errorMessage}</div>}
+                    </td>
+                  </tr>
+                )) : (
+                  <tr><td colSpan={6} style={{ padding: '16px', textAlign: 'center', color: 'var(--text-muted)' }}>No connectors initialized</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Store Health */}
+          <h3 style={{ fontSize: '0.85rem', marginBottom: '10px', color: 'var(--text-secondary)', fontWeight: 700 }}>STORE HEALTH</h3>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '10px', marginBottom: '20px' }}>
+            {[
+              { label: 'Products', value: diagnostics.storeHealth.productCount },
+              { label: 'Total Deals', value: diagnostics.storeHealth.dealEventCount },
+              { label: 'Active Deals', value: diagnostics.storeHealth.activeDealCount },
+              { label: 'Price Points', value: diagnostics.storeHealth.priceHistoryEntries },
+              { label: 'Alerts', value: diagnostics.storeHealth.alertCount },
+            ].map(item => (
+              <div key={item.label} style={{ background: 'var(--bg-surface)', padding: '12px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-subtle)', textAlign: 'center' }}>
+                <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginBottom: '4px' }}>{item.label}</div>
+                <div style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-primary)' }}>{item.value}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* Recent Errors */}
+          <h3 style={{ fontSize: '0.85rem', marginBottom: '10px', color: 'var(--text-secondary)', fontWeight: 700 }}>RECENT ERROR LOG</h3>
+          <div style={{ background: 'var(--bg-surface)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)', overflow: 'hidden' }}>
+            {diagnostics.recentErrors.length === 0 ? (
+              <div style={{ padding: '20px', textAlign: 'center', color: 'var(--loot-green)', fontSize: '0.85rem' }}>
+                ✓ No errors recorded. System operating normally.
+              </div>
+            ) : (
+              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.78rem' }}>
+                <thead>
+                  <tr style={{ background: 'var(--bg-deep)', color: 'var(--text-muted)' }}>
+                    <th style={{ padding: '8px 16px' }}>Time</th>
+                    <th style={{ padding: '8px 16px' }}>Source</th>
+                    <th style={{ padding: '8px 16px' }}>Error Message</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {diagnostics.recentErrors.map((err: any, i: number) => (
+                    <tr key={i} style={{ borderTop: '1px solid var(--border-subtle)' }}>
+                      <td style={{ padding: '8px 16px', color: 'var(--text-muted)', whiteSpace: 'nowrap', fontSize: '0.72rem' }}>
+                        {new Date(err.timestamp).toLocaleString()}
+                      </td>
+                      <td style={{ padding: '8px 16px', fontWeight: 600, color: '#ef4444' }}>{err.source}</td>
+                      <td style={{ padding: '8px 16px', color: 'var(--text-secondary)', wordBreak: 'break-word' }}>{err.message}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </>
+      )}
     </div>
   );
 };
+

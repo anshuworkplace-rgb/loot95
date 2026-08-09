@@ -24,9 +24,6 @@ export const DealCard: React.FC<DealCardProps> = ({ deal, onSelect }) => {
           <span className={`deal-badge ${classification}`}>
             {classification.replace('_', ' ')}
           </span>
-          {product.platform === 'simulator' && (
-            <span className="deal-sim-tag">SIMULATED DATA</span>
-          )}
           <span className="deal-brand">{product.brand}</span>
         </div>
 

@@ -42,7 +42,7 @@ export async function sendLoot95EmailAlert(deal: DealEvent, recipientEmail?: str
     return false;
   }
 
-  const { product, currentPrice, normalPrice, realDiscountPct, lootScore, classification, aiJudge } = deal;
+  const { product, currentPrice, normalPrice, realDiscountPct, lootScore, classification, aiReasoning } = deal;
 
   const subject = `🚨 LOOT 95 ALERT [Score: ${lootScore}]: ${product.title.substring(0, 45)} (₹${currentPrice.toLocaleString('en-IN')}) — ${realDiscountPct}% REAL OFF!`;
 
@@ -93,7 +93,7 @@ export async function sendLoot95EmailAlert(deal: DealEvent, recipientEmail?: str
       </div>
 
       <p style="color:#d1d5db; font-size:14px; line-height:1.5;">
-        <strong>AI Deal Audit:</strong> ${aiJudge?.reasoning || 'Verified genuine price drop below 30-day historical median.'}
+        <strong>AI Deal Audit:</strong> ${aiReasoning || 'Verified genuine price drop below 30-day historical median.'}
       </p>
 
       <a href="${product.url}" class="cta-button" target="_blank">⚡ GRAB DEAL NOW ON AMAZON →</a>
