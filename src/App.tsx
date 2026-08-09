@@ -187,12 +187,20 @@ export function App() {
 // ─── 10x Upgraded Personal Radar View Component ────────────────
 
 const PreferencesView: React.FC = () => {
-  const [minDiscount, setMinDiscount] = useState('80');
-  const [minPrice, setMinPrice] = useState('1000');
-  const [excludeAccessories, setExcludeAccessories] = useState(true);
+  const getInitialPrefs = () => {
+    if (typeof window === 'undefined') return null;
+    const raw = localStorage.getItem('loot95_user_prefs');
+    return raw ? JSON.parse(raw) : null;
+  };
+
+  const initial = getInitialPrefs();
+
+  const [minDiscount, setMinDiscount] = useState(initial?.minDiscount ?? '80');
+  const [minPrice, setMinPrice] = useState(initial?.minPrice ?? '1000');
+  const [excludeAccessories, setExcludeAccessories] = useState(initial?.excludeAccessories ?? true);
   const [savedStatus, setSavedStatus] = useState('');
 
-  const [categories, setCategories] = useState({
+  const [categories, setCategories] = useState(initial?.categories ?? {
     smartphones: true,
     laptops: true,
     audio: true,
@@ -201,7 +209,7 @@ const PreferencesView: React.FC = () => {
     appliances: true,
   });
 
-  const [brands, setBrands] = useState({
+  const [brands, setBrands] = useState(initial?.brands ?? {
     apple: true,
     sony: true,
     samsung: true,

@@ -22,8 +22,23 @@ export const LiveRadar: React.FC<LiveRadarProps> = ({
 }) => {
   const [categoryFilter, setCategoryFilter] = useState<string>('ALL');
 
+  const JUNK_ACCESSORY_KEYWORDS = [
+    'back cover', 'case', 'cover', 'silicon', 'silicone', 'tempered glass', 'screen protector',
+    'guard', 'cable', 'adapter', 'charger cable', 'pouch', 'strap', 'skin', 'holder',
+    'stand', 'converter', 'lanyard', 'film', 'sleeve', 'keychain', 'tpu'
+  ];
+
+  // Read saved user preferences from localStorage
+  const savedPrefsRaw = typeof window !== 'undefined' ? localStorage.getItem('loot95_user_prefs') : null;
+  const userPrefs = savedPrefsRaw ? JSON.parse(savedPrefsRaw) : null;
+
   // Filter deals
   const filteredDeals = deals.filter(deal => {
+    // IF NO_FILTER TAB IS ACTIVE, BYPASS ALL FILTERS
+    if (activeFilter === 'NO_FILTER') {
+      return true;
+    }
+
     // Classification filter
     if (activeFilter !== 'ALL' && deal.classification !== activeFilter) {
       return false;
@@ -32,6 +47,39 @@ export const LiveRadar: React.FC<LiveRadarProps> = ({
     if (!categoryFilter.startsWith('ALL') && deal.product.subcategory !== categoryFilter) {
       return false;
     }
+
+    // Apply User Preferences (if set)
+    if (userPrefs) {
+      const minDiscountVal = parseInt(userPrefs.minDiscount || '0', 10);
+      const minPriceVal = parseInt(userPrefs.minPrice || '0', 10);
+
+      // Minimum Discount Filter
+      if (minDiscountVal > 0 && deal.realDiscountPct < minDiscountVal) {
+        return false;
+      }
+
+      // Minimum Price Floor Filter
+      if (minPriceVal > 0 && deal.currentPrice < minPriceVal) {
+        return false;
+      }
+
+      // Anti-Junk Accessory Shield Filter
+      if (userPrefs.excludeAccessories) {
+        const lowerTitle = deal.product.title.toLowerCase();
+        if (JUNK_ACCESSORY_KEYWORDS.some(kw => lowerTitle.includes(kw))) {
+          return false;
+        }
+      }
+
+      // Brand Filter
+      if (userPrefs.brands) {
+        const brandKey = deal.product.brand.toLowerCase();
+        if (userPrefs.brands[brandKey] === false) {
+          return false;
+        }
+      }
+    }
+
     return true;
   });
 
