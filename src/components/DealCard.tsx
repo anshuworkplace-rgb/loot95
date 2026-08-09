@@ -34,11 +34,19 @@ export const DealCard: React.FC<DealCardProps> = ({ deal, onSelect }) => {
 
         <div className="deal-price-row">
           <span className="deal-current-price">{formatPrice(currentPrice)}</span>
-          <span className="deal-original-price">{formatPrice(normalPrice)}</span>
-          <span className="deal-discount">
-            {realDiscountPct}% REAL OFF
-          </span>
-          {displayedDiscountPct > realDiscountPct && (
+          {normalPrice > currentPrice && (
+            <span className="deal-original-price">{formatPrice(normalPrice)}</span>
+          )}
+          {realDiscountPct > 0 ? (
+            <span className="deal-discount">
+              {realDiscountPct}% REAL OFF
+            </span>
+          ) : (
+            <span style={{ fontSize: '0.75rem', padding: '2px 6px', background: 'rgba(255,255,255,0.06)', color: 'var(--text-muted)', borderRadius: '4px' }}>
+              REGULAR PRICE
+            </span>
+          )}
+          {displayedDiscountPct > realDiscountPct && displayedDiscountPct > 0 && (
             <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
               ({displayedDiscountPct}% MRP OFF)
             </span>

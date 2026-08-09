@@ -53,17 +53,21 @@ export async function processPriceEvent(product: Product, priceEvent: PriceEvent
   const hasSufficientHistory = primaryStats && primaryStats.sampleCount >= 5;
 
   // ─── DETERMINE NORMAL PRICE ───────────────────────────────
-  // If sufficient history exists, use historical median. Otherwise, estimate normal market price from MRP (~18% typical discount)
-  const estimatedNormalFromMrp = product.mrp > priceEvent.effectivePrice
-    ? Math.max(priceEvent.effectivePrice * 1.05, Math.round(product.mrp * 0.82))
-    : priceEvent.effectivePrice;
+  // If historical median exists and differs from effective price, use it.
+  // Otherwise, use product MRP (or estimated standard list price) as normal baseline.
+  let normalPrice = (primaryStats && primaryStats.median > priceEvent.effectivePrice)
+    ? primaryStats.median
+    : product.mrp;
 
-  const normalPrice = hasSufficientHistory ? primaryStats.median : estimatedNormalFromMrp;
-  const historicalMedian = hasSufficientHistory ? primaryStats.median : normalPrice;
-  const historicalLow = primaryStats ? primaryStats.min : priceEvent.effectivePrice;
+  if (!normalPrice || normalPrice <= priceEvent.effectivePrice) {
+    normalPrice = Math.round(priceEvent.effectivePrice * 1.25);
+  }
 
-  // Real discount = discount vs actual normal market selling price
-  const realDiscountPct = Math.round((normalPrice - priceEvent.effectivePrice) / normalPrice * 100);
+  const historicalMedian = primaryStats?.median || normalPrice;
+  const historicalLow = primaryStats?.min || priceEvent.effectivePrice;
+
+  // Real discount = discount vs actual normal baseline selling price
+  const realDiscountPct = Math.max(0, Math.round((normalPrice - priceEvent.effectivePrice) / normalPrice * 100));
 
   // Fast reject: less than 30% real discount → not interesting enough
   if (realDiscountPct < 30 && mrpDiscount < 50) {
