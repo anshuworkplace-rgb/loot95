@@ -10,7 +10,7 @@
   "routes": [
     {
       "src": "/api/(.*)",
-      "dest": "https://loot95-backend.koyeb.app/api/$1"
+      "dest": "https://loot95.onrender.com/api/$1"
     },
     {
       "handle": "filesystem"
