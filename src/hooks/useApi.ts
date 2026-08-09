@@ -17,6 +17,16 @@ export function useSSE() {
   const eventSourceRef = useRef<EventSource | null>(null);
 
   useEffect(() => {
+    // Fetch initial active deals on mount
+    fetch(`${API_BASE}/api/deals`)
+      .then(r => r.json())
+      .then(res => {
+        if (res.data?.deals && Array.isArray(res.data.deals)) {
+          setDeals(res.data.deals);
+        }
+      })
+      .catch(() => {});
+
     const connect = () => {
       const es = new EventSource(`${API_BASE}/api/events`);
       eventSourceRef.current = es;

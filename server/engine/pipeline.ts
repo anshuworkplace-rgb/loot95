@@ -32,8 +32,8 @@ export async function processPriceEvent(product: Product, priceEvent: PriceEvent
   // ─── FAST PATH: Reject non-interesting events ─────────────
   const mrpDiscount = (product.mrp - priceEvent.effectivePrice) / product.mrp * 100;
 
-  // Fast reject: less than 30% off MRP → not interesting
-  if (mrpDiscount < 30) {
+  // Fast reject: less than 5% off MRP → not interesting
+  if (mrpDiscount < 5) {
     store.incrementProcessedEvents();
     return null;
   }

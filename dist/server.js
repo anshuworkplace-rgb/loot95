@@ -943,7 +943,7 @@ import { v4 as uuid } from "uuid";
 async function processPriceEvent(product, priceEvent) {
   const startTime = Date.now();
   const mrpDiscount = (product.mrp - priceEvent.effectivePrice) / product.mrp * 100;
-  if (mrpDiscount < 30) {
+  if (mrpDiscount < 5) {
     store.incrementProcessedEvents();
     return null;
   }
