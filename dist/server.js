@@ -1619,26 +1619,21 @@ import { v4 as uuid3 } from "uuid";
 var RAPIDAPI_KEY2 = process.env.RAPIDAPI_KEY || "";
 var RAPIDAPI_HOST = process.env.RAPIDAPI_HOST || "real-time-amazon-data.p.rapidapi.com";
 var ELECTRONICS_QUERIES = [
-  "Sony wireless headphones deals",
-  "Apple iPhone 16 price drop",
-  "Samsung Galaxy 5G smartphone discount",
-  "Laptops i7 16GB RAM offers",
-  "Smart TV 55 inch 4K discount",
-  "Apple AirPods Pro 2",
-  "Dyson vacuum cleaner deal",
-  "OnePlus 12R 5G deal",
-  "MacBook Air M3 offer",
-  "Gaming Laptop RTX 4060",
-  "Samsung OLED TV 55 inch",
-  "PS5 console disc edition",
-  "JBL Bluetooth speaker discount",
-  "Asus ROG gaming laptop",
-  "iPad 10th Gen offer",
-  "Pixel 9 Pro price drop",
-  "boAt Airdopes discount",
-  "Realme GT 6 5G deal",
-  "Canon EOS R50 camera",
-  "Apple Watch Series 10"
+  "electronics deals of the day",
+  "high discount smartphones",
+  "laptops price drop",
+  "wireless headphones offers",
+  "smart tv 4k discount",
+  "best tech offers",
+  "tablets price crash",
+  "gaming laptop deals",
+  "smartwatch discounts",
+  "bluetooth speaker offers",
+  "pc components discount",
+  "camera price drop",
+  "audio system offers",
+  "gadgets loot deals",
+  "electronics clearance sale"
 ];
 async function fetchRealAmazonDeals(query = "electronics deals") {
   const currentKey = process.env.RAPIDAPI_KEY || RAPIDAPI_KEY2;
@@ -1771,15 +1766,15 @@ function startRealAmazonPolling(intervalMs = 2e4) {
       console.error("[RapidAPI Connector] Polling cycle error:", err.message);
     }
   };
-  setTimeout(() => fetchRealAmazonDeals("Sony wireless headphones deals").catch(() => {
+  setTimeout(() => fetchRealAmazonDeals("electronics deals of the day").catch(() => {
   }), 500);
-  setTimeout(() => fetchRealAmazonDeals("Apple iPhone 16 price drop").catch(() => {
+  setTimeout(() => fetchRealAmazonDeals("high discount smartphones").catch(() => {
   }), 3e3);
-  setTimeout(() => fetchRealAmazonDeals("Laptops i7 16GB RAM offers").catch(() => {
+  setTimeout(() => fetchRealAmazonDeals("laptops price drop").catch(() => {
   }), 5500);
-  setTimeout(() => fetchRealAmazonDeals("Samsung OLED TV 55 inch").catch(() => {
+  setTimeout(() => fetchRealAmazonDeals("smart tv 4k discount").catch(() => {
   }), 8e3);
-  setTimeout(() => fetchRealAmazonDeals("boAt Airdopes discount").catch(() => {
+  setTimeout(() => fetchRealAmazonDeals("wireless headphones offers").catch(() => {
   }), 10500);
   pollTimer = setInterval(poll, intervalMs);
 }

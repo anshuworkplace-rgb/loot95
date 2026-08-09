@@ -12,28 +12,23 @@ import { processPriceEvent } from '../engine/pipeline.js';
 const RAPIDAPI_KEY = process.env.RAPIDAPI_KEY || '';
 const RAPIDAPI_HOST = process.env.RAPIDAPI_HOST || 'real-time-amazon-data.p.rapidapi.com';
 
-// Target electronics search queries for real-time deal discovery
+// Target electronics search queries for discovering real high-value deals across all categories
 const ELECTRONICS_QUERIES = [
-  'Sony wireless headphones deals',
-  'Apple iPhone 16 price drop',
-  'Samsung Galaxy 5G smartphone discount',
-  'Laptops i7 16GB RAM offers',
-  'Smart TV 55 inch 4K discount',
-  'Apple AirPods Pro 2',
-  'Dyson vacuum cleaner deal',
-  'OnePlus 12R 5G deal',
-  'MacBook Air M3 offer',
-  'Gaming Laptop RTX 4060',
-  'Samsung OLED TV 55 inch',
-  'PS5 console disc edition',
-  'JBL Bluetooth speaker discount',
-  'Asus ROG gaming laptop',
-  'iPad 10th Gen offer',
-  'Pixel 9 Pro price drop',
-  'boAt Airdopes discount',
-  'Realme GT 6 5G deal',
-  'Canon EOS R50 camera',
-  'Apple Watch Series 10',
+  'electronics deals of the day',
+  'high discount smartphones',
+  'laptops price drop',
+  'wireless headphones offers',
+  'smart tv 4k discount',
+  'best tech offers',
+  'tablets price crash',
+  'gaming laptop deals',
+  'smartwatch discounts',
+  'bluetooth speaker offers',
+  'pc components discount',
+  'camera price drop',
+  'audio system offers',
+  'gadgets loot deals',
+  'electronics clearance sale'
 ];
 
 export async function fetchRealAmazonDeals(query: string = 'electronics deals') {
@@ -195,12 +190,12 @@ export function startRealAmazonPolling(intervalMs: number = 20000) { // Fast 20s
     }
   };
 
-  // Immediate sequential warm-up across top 5 electronics categories (2.5s gaps)
-  setTimeout(() => fetchRealAmazonDeals('Sony wireless headphones deals').catch(() => {}), 500);
-  setTimeout(() => fetchRealAmazonDeals('Apple iPhone 16 price drop').catch(() => {}), 3000);
-  setTimeout(() => fetchRealAmazonDeals('Laptops i7 16GB RAM offers').catch(() => {}), 5500);
-  setTimeout(() => fetchRealAmazonDeals('Samsung OLED TV 55 inch').catch(() => {}), 8000);
-  setTimeout(() => fetchRealAmazonDeals('boAt Airdopes discount').catch(() => {}), 10500);
+  // Immediate sequential warm-up across broad high-yield value categories (2.5s gaps)
+  setTimeout(() => fetchRealAmazonDeals('electronics deals of the day').catch(() => {}), 500);
+  setTimeout(() => fetchRealAmazonDeals('high discount smartphones').catch(() => {}), 3000);
+  setTimeout(() => fetchRealAmazonDeals('laptops price drop').catch(() => {}), 5500);
+  setTimeout(() => fetchRealAmazonDeals('smart tv 4k discount').catch(() => {}), 8000);
+  setTimeout(() => fetchRealAmazonDeals('wireless headphones offers').catch(() => {}), 10500);
 
   pollTimer = setInterval(poll, intervalMs);
 }
