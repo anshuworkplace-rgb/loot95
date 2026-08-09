@@ -1550,7 +1550,7 @@ async function fetchLiveDealsFromStream() {
         processedDeals.push(deal);
       }
     }
-    totalEventsProcessed += slice.length;
+    totalEventsProcessed += validItems.length;
     store.setConnectorStatus({
       platform: "amazon",
       status: "ONLINE",

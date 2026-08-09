@@ -170,7 +170,7 @@ export async function fetchLiveDealsFromStream() {
       }
     }
 
-    totalEventsProcessed += slice.length;
+    totalEventsProcessed += validItems.length;
 
     // Report status to Store
     store.setConnectorStatus({
