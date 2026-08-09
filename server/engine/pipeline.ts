@@ -62,8 +62,8 @@ export async function processPriceEvent(product: Product, priceEvent: PriceEvent
   // Real discount = discount vs actual normal selling price (NOT MRP)
   const realDiscountPct = Math.round((normalPrice - priceEvent.effectivePrice) / normalPrice * 100);
 
-  // Fast reject: less than 30% real discount → not interesting enough
-  if (realDiscountPct < 30 && mrpDiscount < 50) {
+  // Fast reject: Any event with <= 5% real discount is normal price → REJECT!
+  if (realDiscountPct <= 5) {
     store.incrementProcessedEvents();
     return null;
   }
