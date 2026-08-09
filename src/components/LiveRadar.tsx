@@ -23,9 +23,9 @@ export const LiveRadar: React.FC<LiveRadarProps> = ({
   const [categoryFilter, setCategoryFilter] = useState<string>('ALL');
 
   const JUNK_ACCESSORY_KEYWORDS = [
-    'back cover', 'case', 'cover', 'silicon', 'silicone', 'tempered glass', 'screen protector',
-    'guard', 'cable', 'adapter', 'charger cable', 'pouch', 'strap', 'skin', 'holder',
-    'stand', 'converter', 'lanyard', 'film', 'sleeve', 'keychain', 'tpu'
+    'back cover', 'phone case', 'silicone case', 'silicone cover', 'tempered glass',
+    'screen protector', 'camera lens protector', 'charging cable', 'cable adapter',
+    'pouch case', 'watch strap', 'phone stand', 'screen guard'
   ];
 
   // Read saved user preferences from localStorage
