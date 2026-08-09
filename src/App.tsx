@@ -9,6 +9,7 @@ import { StatsBar } from './components/StatsBar';
 import { LiveRadar } from './components/LiveRadar';
 import { DealDetail } from './components/DealDetail';
 import { SubmitDealModal } from './components/SubmitDealModal';
+import { EmailAlertModal } from './components/EmailAlertModal';
 import type { DealEvent } from '../shared/types';
 
 export function App() {
@@ -17,6 +18,7 @@ export function App() {
   const [currentView, setCurrentView] = useState<'RADAR' | 'LOOT95' | 'RARE' | 'PREFERENCES' | 'ADMIN'>('RADAR');
   const [activeFilter, setActiveFilter] = useState<string>('ALL');
   const [isSubmitModalOpen, setIsSubmitModalOpen] = useState(false);
+  const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
 
   // Compute metrics
   const loot95Deals = liveDeals.filter(d => d.classification === 'LOOT_95' || d.classification === 'EXTREME');
@@ -89,6 +91,25 @@ export function App() {
 
           <div className="header-metrics" style={{ alignItems: 'center' }}>
             <button
+              onClick={() => setIsEmailModalOpen(true)}
+              style={{
+                padding: '8px 14px',
+                background: 'rgba(16, 185, 129, 0.15)',
+                color: 'var(--loot-green)',
+                fontWeight: 700,
+                fontSize: '0.75rem',
+                border: '1px solid rgba(16, 185, 129, 0.4)',
+                borderRadius: 'var(--radius-sm)',
+                cursor: 'pointer',
+                fontFamily: 'var(--font-mono)',
+                letterSpacing: '0.5px',
+                marginRight: '8px',
+              }}
+            >
+              📧 EMAIL ALERTS
+            </button>
+
+            <button
               onClick={() => setIsSubmitModalOpen(true)}
               style={{
                 padding: '8px 16px',
@@ -145,6 +166,11 @@ export function App() {
           />
         )}
       </main>
+
+      <EmailAlertModal
+        isOpen={isEmailModalOpen}
+        onClose={() => setIsEmailModalOpen(false)}
+      />
 
       <SubmitDealModal
         isOpen={isSubmitModalOpen}

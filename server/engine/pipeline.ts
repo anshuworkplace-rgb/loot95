@@ -16,6 +16,7 @@ import {
   predictPreLoot, isNeverSeenBefore,
 } from './intelligence.js';
 import { judgeDeal } from '../ai/deal-judge.js';
+import { sendLoot95EmailAlert } from '../notifications/email.js';
 
 const config = DEFAULT_SCORING_CONFIG;
 
@@ -163,6 +164,11 @@ export async function processPriceEvent(product: Product, priceEvent: PriceEvent
 
   // Push initial deal event to SSE clients
   broadcastDeal(dealEvent);
+
+  // Trigger Email Alert for rare/loot deals (score >= 70 or LOOT_95 / EXTREME / PRICE_ERROR)
+  if (dealEvent.lootScore >= 70 || ['LOOT_95', 'EXTREME', 'PRICE_ERROR'].includes(dealEvent.classification)) {
+    sendLoot95EmailAlert(dealEvent).catch(e => console.error('[Pipeline] Email alert error:', e));
+  }
 
   console.log(
     `[Pipeline] ${classification} | Score: ${dealEvent.lootScore} | ` +

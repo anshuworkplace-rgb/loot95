@@ -199,6 +199,55 @@ app.get('/api/metrics', (_req, res) => {
   });
 });
 
+// Email Alert Settings
+app.post('/api/settings/email', (req, res) => {
+  const { email } = req.body;
+  if (!email || !email.includes('@')) {
+    res.status(400).json({ success: false, error: 'Invalid email address' });
+    return;
+  }
+  const { setRecipientEmail } = require('./notifications/email.js');
+  setRecipientEmail(email);
+  res.json({ success: true, message: `Alert email set to ${email}`, email });
+});
+
+// Test Email Alert Trigger
+app.post('/api/test/email', async (req, res) => {
+  try {
+    const { sendLoot95EmailAlert, ALERT_EMAIL_RECIPIENT } = await import('./notifications/email.js');
+    const { deals } = store.getDealEvents({ limit: 1 });
+    const sampleDeal = deals[0] || {
+      id: 'test_deal',
+      product: {
+        title: 'Sony WH-1000XM5 Wireless Headphones (Black)',
+        brand: 'Sony',
+        category: 'Electronics',
+        subcategory: 'Headphones',
+        mrp: 34990,
+        url: 'https://www.amazon.in/s?k=Sony+WH-1000XM5',
+      },
+      currentPrice: 1999,
+      normalPrice: 28000,
+      realDiscountPct: 93,
+      displayedDiscountPct: 94,
+      lootScore: 94.5,
+      classification: 'LOOT_95',
+      aiVerdict: 'VERIFIED_LOOT',
+      aiReasoning: 'Verified genuine 93% price drop below 30-day historical median.',
+    };
+
+    const targetEmail = req.body.email || ALERT_EMAIL_RECIPIENT;
+    const sent = await sendLoot95EmailAlert(sampleDeal as any, targetEmail);
+    res.json({
+      success: true,
+      message: sent ? `Test email alert sent to ${targetEmail}` : 'Email alert logged to console.',
+      targetEmail,
+    });
+  } catch (e: any) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
 // ─── Serve Built Static Frontend (Production SPA Fallback) ──────
 const distPath = path.join(process.cwd(), 'dist');
 app.use(express.static(distPath));
