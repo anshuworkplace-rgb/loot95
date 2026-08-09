@@ -61,7 +61,8 @@ class Store {
       'garbage bag', 'trash bag', 'skate scooter', 'floor mat', 'bath mat', 'doormat',
       'why ', 'how to', 'is it', 'review', 'guide', 'best ', 'top 10', 'what is',
       'hosting', 'hostinger', 'bluehost', 'wordpress', 'domain', 'meaning than size',
-      'valentine\'s day', 'survey', 'quiz', 'contest', 'earn', 'free gift card', 'cashback'
+      'valentine\'s day', 'survey', 'quiz', 'contest', 'earn', 'free gift card', 'cashback',
+      'amazon today\'s deal', 'amazon 50%+', 'amazon bestseller:', 'amazon movers & shakers:'
     ];
 
     for (const [id, p] of this.products.entries()) {

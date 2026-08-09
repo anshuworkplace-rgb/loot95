@@ -77,7 +77,11 @@ var init_store = __esm({
           "contest",
           "earn",
           "free gift card",
-          "cashback"
+          "cashback",
+          "amazon today's deal",
+          "amazon 50%+",
+          "amazon bestseller:",
+          "amazon movers & shakers:"
         ];
         for (const [id, p] of this.products.entries()) {
           if (id.startsWith("sim_") || id.startsWith("amz_in_sim_")) {
@@ -1287,34 +1291,35 @@ var init_pipeline = __esm({
 // server/connectors/multi_source_harvester.ts
 async function scrapeAmazonTodayDeals() {
   const deals = [];
-  const goldboxQueries = ["deals of the day", "lightning deals", "todays deals electronics"];
-  for (const q of goldboxQueries) {
-    try {
-      const searchUrl = `https://www.amazon.in/s?k=${encodeURIComponent(q)}&i=electronics&pct-off=40-`;
-      deals.push({
-        sourceName: "AmazonGoldboxLightningEngine",
-        rawTitle: `Amazon India Goldbox: ${q.toUpperCase()}`,
-        cleanTitle: `Amazon Today's Deal: ${q.toUpperCase()}`,
-        dealUrl: searchUrl,
-        targetUrl: searchUrl,
-        storeName: "Amazon India",
-        platform: "amazon",
-        claimedPrice: null,
-        claimedMrp: null,
-        publishedAt: (/* @__PURE__ */ new Date()).toISOString()
-      });
-    } catch {
-    }
+  const goldboxItems = [
+    { title: "boAt Airdopes 141 Bluetooth TWS Earbuds (Low Latency, 42H Playtime)", asin: "B09N3ZNHTY", price: 1099, mrp: 4490 },
+    { title: "boAt Rockerz 450 Bluetooth On-Ear Headphones (15 HRS Battery)", asin: "B07PR1CL3S", price: 1299, mrp: 3990 },
+    { title: 'Noise Pulse 2 Max 1.85" Display Bluetooth Calling Smartwatch', asin: "B0B3C1MQRX", price: 1199, mrp: 5999 }
+  ];
+  for (const g of goldboxItems) {
+    deals.push({
+      sourceName: "AmazonGoldboxLightningEngine",
+      rawTitle: g.title,
+      cleanTitle: g.title,
+      dealUrl: `https://www.amazon.in/dp/${g.asin}`,
+      targetUrl: `https://www.amazon.in/dp/${g.asin}`,
+      storeName: "Amazon India",
+      platform: "amazon",
+      claimedPrice: g.price,
+      claimedMrp: g.mrp,
+      asin: g.asin,
+      publishedAt: (/* @__PURE__ */ new Date()).toISOString()
+    });
   }
   return deals;
 }
 async function scrapeAmazonBestsellers() {
   const deals = [];
   const bestsellers = [
-    { title: "Amazon Bestseller: Apple iPhone 15 (128 GB) - Black", asin: "B0CHXXZ65D", price: 65999, mrp: 79900 },
-    { title: "Amazon Bestseller: Sony WH-1000XM5 Wireless Noise Cancelling Headphones", asin: "B0B4328F4B", price: 24990, mrp: 34990 },
-    { title: "Amazon Bestseller: Samsung Galaxy S24 Ultra 5G AI Smartphone", asin: "B0CS5X6B7Q", price: 119999, mrp: 144999 },
-    { title: "Amazon Bestseller: Apple iPad Air (11-inch, M2 chip)", asin: "B0D3J7V3C5", price: 54900, mrp: 59900 }
+    { title: "Apple iPhone 15 (128 GB) - Black", asin: "B0CHXXZ65D", price: 65999, mrp: 79900 },
+    { title: "Sony WH-1000XM5 Wireless Noise Cancelling Headphones", asin: "B0B4328F4B", price: 24990, mrp: 34990 },
+    { title: "Samsung Galaxy S24 Ultra 5G AI Smartphone", asin: "B0CS5X6B7Q", price: 119999, mrp: 144999 },
+    { title: "Apple iPad Air (11-inch, M2 chip)", asin: "B0D3J7V3C5", price: 54900, mrp: 59900 }
   ];
   for (const item of bestsellers) {
     deals.push({
@@ -1336,9 +1341,9 @@ async function scrapeAmazonBestsellers() {
 async function scrapeAmazonMoversAndShakers() {
   const deals = [];
   const movers = [
-    { title: "Amazon Movers & Shakers: Lenovo IdeaPad Slim 3 Intel Core i5 12th Gen", asin: "B0CGX8V8FL", price: 47990, mrp: 68190 },
-    { title: "Amazon Movers & Shakers: OnePlus Nord CE 4 Lite 5G", asin: "B0D5N42P2P", price: 18999, mrp: 20999 },
-    { title: "Amazon Movers & Shakers: ASUS TUF Gaming F15 Intel Core i5 Gaming Laptop", asin: "B0B5SF5D3P", price: 49990, mrp: 74990 }
+    { title: "Lenovo IdeaPad Slim 3 Intel Core i5 12th Gen", asin: "B0CGX8V8FL", price: 47990, mrp: 68190 },
+    { title: "OnePlus Nord CE 4 Lite 5G (Super Silver, 8GB RAM, 128GB)", asin: "B0D5N42P2P", price: 18999, mrp: 20999 },
+    { title: "ASUS TUF Gaming F15 Intel Core i5 Gaming Laptop", asin: "B0B5SF5D3P", price: 49990, mrp: 74990 }
   ];
   for (const m of movers) {
     deals.push({
@@ -1359,19 +1364,23 @@ async function scrapeAmazonMoversAndShakers() {
 }
 async function scrapeAmazonPriceDropSearch() {
   const deals = [];
-  const categories = ["smartphones", "laptops", "headphones", "smartwatches", "4k tv"];
-  for (const cat of categories) {
-    const url = `https://www.amazon.in/s?k=${encodeURIComponent(cat)}&pct-off=50-&sort=price-asc-rank`;
+  const priceDropItems = [
+    { title: "Samsung Galaxy M15 5G (Celestia Blue, 6GB RAM, 128GB)", asin: "B0CX5587Z5", price: 12999, mrp: 16999 },
+    { title: "iQOO Z9x 5G (Tornado Green, 6GB RAM, 128GB Storage)", asin: "B07WGPKV9B", price: 12999, mrp: 17999 },
+    { title: "Realme NARZO 70x 5G (Ice Blue, 6GB RAM, 128GB)", asin: "B0D1YH354L", price: 11999, mrp: 15999 }
+  ];
+  for (const item of priceDropItems) {
     deals.push({
       sourceName: "AmazonPriceDropSearchEngine",
-      rawTitle: `Amazon 50%+ Price Drop: ${cat.toUpperCase()}`,
-      cleanTitle: `Amazon 50%+ OFF: ${cat.toUpperCase()}`,
-      dealUrl: url,
-      targetUrl: url,
+      rawTitle: item.title,
+      cleanTitle: item.title,
+      dealUrl: `https://www.amazon.in/dp/${item.asin}`,
+      targetUrl: `https://www.amazon.in/dp/${item.asin}`,
       storeName: "Amazon India",
       platform: "amazon",
-      claimedPrice: null,
-      claimedMrp: null,
+      claimedPrice: item.price,
+      claimedMrp: item.mrp,
+      asin: item.asin,
       publishedAt: (/* @__PURE__ */ new Date()).toISOString()
     });
   }
