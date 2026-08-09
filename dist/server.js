@@ -1544,8 +1544,24 @@ function safeIsoDate(dateStr) {
 }
 async function harvestAmazonDirectDeals() {
   const deals = [];
-  const searchKeywords = ["laptop deals", "smartphone deals", "sony headphones", "apple ipad", "4k tv sale", "ssd 1tb"];
-  for (const kw of searchKeywords.slice(0, 3)) {
+  const searchKeywords = [
+    "laptop deals",
+    "smartphone deals",
+    "sony headphones",
+    "apple ipad",
+    "4k tv sale",
+    "ssd 1tb",
+    "macbook air",
+    "samsung galaxy",
+    "oneplus 12",
+    "gaming laptop",
+    "lg 4k tv",
+    "bose noise cancelling",
+    "smartwatch sale",
+    "instant pot",
+    "ps5 console"
+  ];
+  for (const kw of searchKeywords) {
     try {
       const url = `https://completion.amazon.in/api/2/suggestions?mid=A21TJRUUN4KGV&alias=aps&prefix=${encodeURIComponent(kw)}`;
       const res = await fetch(url, {
@@ -1557,7 +1573,7 @@ async function harvestAmazonDirectDeals() {
       if (!res.ok) continue;
       const data = await res.json();
       const suggestions = data?.suggestions || [];
-      for (const sug of suggestions.slice(0, 2)) {
+      for (const sug of suggestions.slice(0, 3)) {
         const value = sug?.value;
         if (!value) continue;
         const cleanTitle = `Amazon India: ${value.toUpperCase()}`;
@@ -1580,118 +1596,7 @@ async function harvestAmazonDirectDeals() {
   }
   return deals;
 }
-async function harvestFlipkartDirectDeals() {
-  const deals = [];
-  const fkCandidates = [
-    { title: "Flipkart Electronics: Premium Smartphones & Laptops", url: "https://www.flipkart.com/search?q=laptop", price: 24999, fsid: "itm12345678" },
-    { title: "Flipkart Super Deals: 4K Smart TVs", url: "https://www.flipkart.com/search?q=4k+tv", price: 18999, fsid: "itm98765432" }
-  ];
-  for (const c of fkCandidates) {
-    deals.push({
-      sourceName: "FlipkartDirectEngine",
-      rawTitle: c.title,
-      cleanTitle: c.title,
-      dealUrl: c.url,
-      targetUrl: c.url,
-      storeName: "Flipkart",
-      platform: "flipkart",
-      claimedPrice: c.price,
-      claimedMrp: Math.round(c.price * 1.35),
-      fsid: c.fsid,
-      publishedAt: (/* @__PURE__ */ new Date()).toISOString()
-    });
-  }
-  return deals;
-}
-async function harvestMyntraDeals() {
-  const deals = [];
-  const myntraCandidates = [
-    { title: "Myntra Brand Fest: Premium Sneakers & Apparel", url: "https://www.myntra.com/shoes", price: 1999, store: "Myntra" },
-    { title: "Myntra Designer Watches & Accessories Drop", url: "https://www.myntra.com/watches", price: 3499, store: "Myntra" }
-  ];
-  for (const item of myntraCandidates) {
-    deals.push({
-      sourceName: "MyntraDirectEngine",
-      rawTitle: item.title,
-      cleanTitle: item.title,
-      dealUrl: item.url,
-      targetUrl: item.url,
-      storeName: "Myntra",
-      platform: "myntra",
-      claimedPrice: item.price,
-      claimedMrp: Math.round(item.price * 1.5),
-      publishedAt: (/* @__PURE__ */ new Date()).toISOString()
-    });
-  }
-  return deals;
-}
-async function harvestCromaRelianceDeals() {
-  const deals = [];
-  const cromaItems = [
-    { title: "Croma Electronics: Sony Bravia 55 inch 4K Ultra HD TV", url: "https://www.croma.com/search?q=sony+tv", price: 54990, platform: "croma", store: "Croma" },
-    { title: "Reliance Digital: Apple MacBook Air M2 8GB/256GB SSD", url: "https://www.reliancedigital.in/search?q=macbook", price: 81900, platform: "reliance_digital", store: "Reliance Digital" }
-  ];
-  for (const c of cromaItems) {
-    deals.push({
-      sourceName: `${c.store}DirectEngine`,
-      rawTitle: c.title,
-      cleanTitle: c.title,
-      dealUrl: c.url,
-      targetUrl: c.url,
-      storeName: c.store,
-      platform: c.platform,
-      claimedPrice: c.price,
-      claimedMrp: Math.round(c.price * 1.25),
-      publishedAt: (/* @__PURE__ */ new Date()).toISOString()
-    });
-  }
-  return deals;
-}
-async function harvestAjioTataCliqDeals() {
-  const deals = [];
-  const items = [
-    { title: "Tata CLiQ Luxury: Premium Audio & Smart Wearables", url: "https://www.tatacliq.com/audio", price: 7999, platform: "tatacliq", store: "Tata CLiQ" },
-    { title: "Ajio Fashion Sale: Levi's & Nike Clearance Drop", url: "https://www.ajio.com/men", price: 1499, platform: "ajio", store: "Ajio" }
-  ];
-  for (const item of items) {
-    deals.push({
-      sourceName: `${item.store}DirectEngine`,
-      rawTitle: item.title,
-      cleanTitle: item.title,
-      dealUrl: item.url,
-      targetUrl: item.url,
-      storeName: item.store,
-      platform: item.platform,
-      claimedPrice: item.price,
-      claimedMrp: Math.round(item.price * 1.4),
-      publishedAt: (/* @__PURE__ */ new Date()).toISOString()
-    });
-  }
-  return deals;
-}
-async function harvestNykaaPepperfryDeals() {
-  const deals = [];
-  const items = [
-    { title: "Pepperfry Home Fest: Ergonomic Mesh Office Chair", url: "https://www.pepperfry.com/chairs", price: 4499, platform: "pepperfry", store: "Pepperfry" },
-    { title: "Nykaa Beauty Mega Drop: Premium Grooming Kits", url: "https://www.nykaa.com/grooming", price: 1299, platform: "nykaa", store: "Nykaa" }
-  ];
-  for (const item of items) {
-    deals.push({
-      sourceName: `${item.store}DirectEngine`,
-      rawTitle: item.title,
-      cleanTitle: item.title,
-      dealUrl: item.url,
-      targetUrl: item.url,
-      storeName: item.store,
-      platform: item.platform,
-      claimedPrice: item.price,
-      claimedMrp: Math.round(item.price * 1.3),
-      publishedAt: (/* @__PURE__ */ new Date()).toISOString()
-    });
-  }
-  return deals;
-}
-async function harvestCommunitySignalFeeds() {
+async function harvestAmazonCommunitySignals() {
   const deals = [];
   try {
     const res = await fetch("https://www.freekaamaal.com/feed", {
@@ -1716,89 +1621,51 @@ async function harvestCommunitySignalFeeds() {
         if (JUNK_KEYWORDS.some((kw) => lowerTitle.includes(kw))) continue;
         const desc = descMatch ? decodeHtmlEntities2(descMatch[1].replace(/<!\[CDATA\[(.*?)\]\]>/g, "$1")) : "";
         const rawLink = linkMatch[1].trim();
+        const asin = extractAmazonAsin(rawLink) || extractAmazonAsin(desc);
+        const isAmazon = lowerTitle.includes("amazon") || rawLink.includes("amazon") || !!asin;
+        if (!isAmazon) continue;
         const priceMatch = cleanTitle.match(/(?:Rs\.?|₹)\s*([0-9,]+)/i) || desc.match(/(?:Rs\.?|₹)\s*([0-9,]+)/i);
         const claimedPrice = priceMatch ? parseInt(priceMatch[1].replace(/,/g, ""), 10) : null;
-        let platform = "amazon";
-        let storeName = "Amazon India";
-        if (lowerTitle.includes("flipkart") || desc.toLowerCase().includes("flipkart")) {
-          platform = "flipkart";
-          storeName = "Flipkart";
-        } else if (lowerTitle.includes("myntra")) {
-          platform = "myntra";
-          storeName = "Myntra";
-        } else if (lowerTitle.includes("croma")) {
-          platform = "croma";
-          storeName = "Croma";
-        } else if (lowerTitle.includes("ajio")) {
-          platform = "ajio";
-          storeName = "Ajio";
-        }
-        const asin = extractAmazonAsin(rawLink) || extractAmazonAsin(desc);
-        const fsid = extractFlipkartFsid(rawLink) || extractFlipkartFsid(desc);
         deals.push({
-          sourceName: "CommunitySignalNetwork",
+          sourceName: "AmazonCommunityNetwork",
           rawTitle,
           cleanTitle,
-          dealUrl: rawLink,
+          dealUrl: rawLink.includes("amazon.in") ? rawLink : asin ? `https://www.amazon.in/dp/${asin}` : rawLink,
           targetUrl: rawLink,
-          storeName,
-          platform,
+          storeName: "Amazon India",
+          platform: "amazon",
           claimedPrice,
           claimedMrp: claimedPrice ? Math.round(claimedPrice * 1.35) : null,
           asin: asin || void 0,
-          fsid: fsid || void 0,
           description: desc.slice(0, 200),
           publishedAt: safeIsoDate(pubDateMatch?.[1])
         });
       }
     }
   } catch (err) {
-    console.warn("[Harvester] Community signal ingestion skipped:", err.message);
+    console.warn("[Harvester] Amazon community signal ingestion skipped:", err.message);
   }
   return deals;
 }
 async function harvestAllCandidateDeals() {
-  console.log("[Harvester] Launching 7+ platform deep ingestion collectors...");
+  console.log("[Harvester] Probing 100% Amazon India Direct & Signal Network...");
   const startTime = Date.now();
-  const [
-    amazonDeals,
-    flipkartDeals,
-    myntraDeals,
-    cromaRelianceDeals,
-    ajioTataCliqDeals,
-    nykaaPepperfryDeals,
-    communityDeals
-  ] = await Promise.all([
+  const [directDeals, communityDeals] = await Promise.all([
     harvestAmazonDirectDeals(),
-    harvestFlipkartDirectDeals(),
-    harvestMyntraDeals(),
-    harvestCromaRelianceDeals(),
-    harvestAjioTataCliqDeals(),
-    harvestNykaaPepperfryDeals(),
-    harvestCommunitySignalFeeds()
+    harvestAmazonCommunitySignals()
   ]);
-  const allCandidates = [
-    ...amazonDeals,
-    ...flipkartDeals,
-    ...myntraDeals,
-    ...cromaRelianceDeals,
-    ...ajioTataCliqDeals,
-    ...nykaaPepperfryDeals,
-    ...communityDeals
-  ];
-  console.log(`[Harvester] Total candidates fetched across 7+ platforms: ${allCandidates.length}`);
-  console.log(`  \u2514\u2500 Amazon: ${amazonDeals.length}, Flipkart: ${flipkartDeals.length}, Myntra: ${myntraDeals.length}`);
-  console.log(`  \u2514\u2500 Croma/Reliance: ${cromaRelianceDeals.length}, Ajio/TataCLiQ: ${ajioTataCliqDeals.length}, Nykaa/Pepperfry: ${nykaaPepperfryDeals.length}, Community: ${communityDeals.length}`);
+  const allCandidates = [...directDeals, ...communityDeals];
+  console.log(`[Harvester] Total Amazon candidates fetched: ${allCandidates.length}`);
   const seenKeys = /* @__PURE__ */ new Set();
   const deduplicated = [];
   for (const c of allCandidates) {
-    const key = c.asin ? `asin_${c.asin}` : c.fsid ? `fsid_${c.fsid}` : `title_${c.cleanTitle.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 30)}`;
+    const key = c.asin ? `asin_${c.asin}` : `title_${c.cleanTitle.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 30)}`;
     if (!seenKeys.has(key)) {
       seenKeys.add(key);
       deduplicated.push(c);
     }
   }
-  console.log(`[Harvester] Ingestion complete in ${Date.now() - startTime}ms. Deduplicated candidates: ${deduplicated.length}`);
+  console.log(`[Harvester] Amazon ingestion complete in ${Date.now() - startTime}ms. Total deduplicated Amazon deals: ${deduplicated.length}`);
   return deduplicated;
 }
 var JUNK_KEYWORDS;

@@ -21,7 +21,6 @@ export const LiveRadar: React.FC<LiveRadarProps> = ({
   onFilterChange,
 }) => {
   const [categoryFilter, setCategoryFilter] = useState<string>('ALL');
-  const [platformFilter, setPlatformFilter] = useState<string>('ALL');
   const [sortBy, setSortBy] = useState<'SCORE' | 'ATL' | 'SAVINGS' | 'NEWEST'>('SCORE');
 
   const JUNK_ACCESSORY_KEYWORDS = [
@@ -33,23 +32,10 @@ export const LiveRadar: React.FC<LiveRadarProps> = ({
   const savedPrefsRaw = typeof window !== 'undefined' ? localStorage.getItem('loot95_user_prefs') : null;
   const userPrefs = savedPrefsRaw ? JSON.parse(savedPrefsRaw) : null;
 
-  const platforms = [
-    { id: 'ALL', label: '🌐 All Stores' },
-    { id: 'amazon', label: 'Amazon India' },
-    { id: 'flipkart', label: 'Flipkart' },
-    { id: 'myntra', label: 'Myntra' },
-    { id: 'croma', label: 'Croma' },
-    { id: 'reliance_digital', label: 'Reliance Digital' },
-    { id: 'ajio', label: 'Ajio' },
-    { id: 'tatacliq', label: 'Tata CLiQ' },
-    { id: 'nykaa', label: 'Nykaa' },
-    { id: 'pepperfry', label: 'Pepperfry' },
-  ];
-
-  // Filter deals
+  // Filter deals — strictly Amazon India
   let filteredDeals = deals.filter(deal => {
-    // Platform Filter
-    if (platformFilter !== 'ALL' && deal.product.platform !== platformFilter) {
+    // Keep strictly Amazon platform
+    if (deal.product.platform !== 'amazon') {
       return false;
     }
 
@@ -117,9 +103,9 @@ export const LiveRadar: React.FC<LiveRadarProps> = ({
     <div className="deal-feed">
       <div className="feed-header">
         <div>
-          <h2>LIVE MULTI-PLATFORM DEAL RADAR</h2>
+          <h2>🛒 100% AMAZON INDIA LIVE RADAR</h2>
           <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-            Direct Intelligence across 7+ Indian Stores • Real-time SSE Stream
+            Direct Intelligence across Amazon.in Deals & Real-Time Price Baseline • SSE Stream
           </span>
         </div>
 
@@ -135,30 +121,6 @@ export const LiveRadar: React.FC<LiveRadarProps> = ({
             </button>
           ))}
         </div>
-      </div>
-
-      {/* 7+ Platform Filter Bar */}
-      <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '6px', marginBottom: '8px' }}>
-        {platforms.map(p => (
-          <button
-            key={p.id}
-            onClick={() => setPlatformFilter(p.id)}
-            style={{
-              padding: '6px 12px',
-              fontSize: '0.72rem',
-              fontWeight: 700,
-              fontFamily: 'var(--font-mono)',
-              borderRadius: 'var(--radius-sm)',
-              border: platformFilter === p.id ? '1px solid var(--loot-green)' : '1px solid var(--border-subtle)',
-              background: platformFilter === p.id ? 'rgba(16, 185, 129, 0.15)' : 'var(--bg-surface)',
-              color: platformFilter === p.id ? 'var(--loot-green)' : 'var(--text-secondary)',
-              cursor: 'pointer',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            {p.label}
-          </button>
-        ))}
       </div>
 
       {/* Secondary Category & Sorting Controls */}
@@ -213,8 +175,8 @@ export const LiveRadar: React.FC<LiveRadarProps> = ({
       {filteredDeals.length === 0 ? (
         <div className="empty-state">
           <div className="icon">📡</div>
-          <h3>Scanning 7+ Platforms for {activeFilter !== 'ALL' ? activeFilter : ''} Deals...</h3>
-          <p>The intelligence engine is continuously monitoring Amazon, Flipkart, Myntra, Croma, Reliance Digital, Ajio, Tata CLiQ, Nykaa, and Pepperfry in real-time.</p>
+          <h3>Scanning Amazon India for {activeFilter !== 'ALL' ? activeFilter : ''} Deals...</h3>
+          <p>The intelligence engine is continuously monitoring Amazon.in in real-time. Genuine low-price deals will appear here instantly.</p>
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
