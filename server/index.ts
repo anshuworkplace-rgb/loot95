@@ -230,14 +230,17 @@ app.listen(PORT, () => {
   console.log('═══════════════════════════════════════════════════════════');
   console.log('');
 
-  // Initialize and start simulation
-  initializeSimulator();
+  const hasRealKeys = !!process.env.RAPIDAPI_KEY;
 
-  // Start generating events every 3 seconds
-  startSimulation(3000);
-
-  // Start Real Amazon India API Polling (if RAPIDAPI_KEY is present)
-  startRealAmazonPolling(600000);
+  if (hasRealKeys) {
+    console.log('[Server] REAL DATA MODE ACTIVE — Disabling dummy simulator, polling real Amazon India deals.');
+    // Poll real Amazon India deals immediately & every 60 seconds
+    startRealAmazonPolling(60000);
+  } else {
+    console.log('[Server] SIMULATION MODE ACTIVE — Set RAPIDAPI_KEY in .env for live Amazon India deals.');
+    initializeSimulator();
+    startSimulation(3000);
+  }
 
   // Broadcast status updates every 10 seconds
   setInterval(() => broadcastStatus(), 10000);
