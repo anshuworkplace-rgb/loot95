@@ -1,6 +1,6 @@
 # ═══════════════════════════════════════════════════════════════
 # LOOT 95 — Production Render Dockerfile
-# Ultra-reliable production build for Render web service
+# Optimized for Render Free Tier (512MB RAM Limit)
 # ═══════════════════════════════════════════════════════════════
 
 FROM node:20-alpine
@@ -12,16 +12,9 @@ ENV NODE_ENV=production
 
 COPY package*.json ./
 
-RUN npm install
+RUN npm install --omit=dev
 
-COPY tsconfig*.json vite.config.ts ./
-COPY shared ./shared
-COPY server ./server
-COPY src ./src
-COPY public ./public
-COPY index.html ./index.html
-
-RUN npm run build
+COPY dist ./dist
 
 EXPOSE 3001
 
