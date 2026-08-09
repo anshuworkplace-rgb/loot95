@@ -218,106 +218,7 @@ let initialized = false;
 // ─── Initialize Products + Build History ──────────────────────
 
 export function initializeSimulator(): void {
-  if (initialized) return;
-
-  console.log('[Simulator] Initializing electronics catalog with realistic price history...');
-
-  for (const template of ELECTRONICS_CATALOG) {
-    const productId = `sim_${template.brand.toLowerCase()}_${template.model.toLowerCase().replace(/\s+/g, '_')}`;
-
-    // Create product
-    const product: Product = {
-      id: productId,
-      brand: template.brand,
-      model: template.model,
-      title: `[SIM] ${template.title}`,
-      category: template.category,
-      subcategory: template.subcategory,
-      platform: 'simulator',
-      platformProductId: productId,
-      url: `https://www.amazon.in/s?k=${encodeURIComponent(template.brand + ' ' + template.model)}`,
-      imageUrl: template.imageUrl,
-      mrp: template.mrp,
-      currentPrice: template.normalHigh,
-      effectivePrice: template.normalHigh,
-      sellerName: 'Simulated Seller',
-      sellerRating: 3.5 + Math.random() * 1.5,
-      stockStatus: 'in_stock',
-      rating: 3.5 + Math.random() * 1.5,
-      reviewCount: Math.floor(100 + Math.random() * 10000),
-      couponRequired: false,
-      bankOfferRequired: false,
-      specifications: {},
-      lastCheckedAt: new Date().toISOString(),
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-
-    store.addProduct(product);
-
-    // Generate 30 days of realistic price history
-    const historyDays = 30;
-    const pointsPerDay = 4; // 4 checks per day
-    const totalPoints = historyDays * pointsPerDay;
-    const priceRange = template.normalHigh - template.normalLow;
-    const prices: number[] = [];
-
-    let currentHistPrice = template.normalLow + Math.random() * priceRange;
-
-    for (let i = 0; i < totalPoints; i++) {
-      const ts = new Date(Date.now() - (totalPoints - i) * 6 * 60 * 60 * 1000);
-
-      // Simulate realistic price movement
-      const volatility = (1 - template.priceStability) * 0.05;
-      const drift = (Math.random() - 0.5) * 2 * volatility * currentHistPrice;
-      currentHistPrice = Math.max(
-        template.normalLow * 0.9,
-        Math.min(template.normalHigh * 1.05, currentHistPrice + drift)
-      );
-
-      // Occasionally add small sale events
-      if (Math.random() < template.discountFrequency * 0.02) {
-        currentHistPrice = template.normalLow * (0.85 + Math.random() * 0.15);
-      }
-
-      // Snap back to normal range
-      if (Math.random() < 0.1 && currentHistPrice < template.normalLow) {
-        currentHistPrice = template.normalLow + Math.random() * priceRange * 0.3;
-      }
-
-      const roundedPrice = Math.round(currentHistPrice / 10) * 10 - 1; // e.g., 24989
-
-      prices.push(roundedPrice);
-      store.addPricePoint(productId, {
-        timestamp: ts.toISOString(),
-        price: roundedPrice,
-        effectivePrice: roundedPrice,
-      });
-    }
-
-    // Set initial price state
-    productPriceState.set(productId, {
-      currentPrice: prices[prices.length - 1],
-      history: prices,
-      lastUpdate: Date.now(),
-      trend: 'stable',
-      trendStrength: 0,
-    });
-  }
-
-  // Mark connector as online
-  store.setConnectorStatus({
-    platform: 'simulator',
-    status: 'ONLINE',
-    lastSuccessAt: new Date().toISOString(),
-    lastErrorAt: null,
-    errorMessage: null,
-    eventsProcessed: 0,
-    avgLatencyMs: 0,
-  });
-
-  console.log(`[Simulator] Initialized ${ELECTRONICS_CATALOG.length} products with ${30 * 4} price points each`);
-  initialized = true;
+  console.log('[Simulator] Fake simulation completely disabled. Operating strictly in 100% REAL AMAZON INDIA API mode.');
 }
 
 // ─── Generate Next Price Event ────────────────────────────────
@@ -407,33 +308,10 @@ export async function generatePriceEvent(): Promise<void> {
 
 // ─── Run Continuous Simulation ────────────────────────────────
 
-let simulationInterval: ReturnType<typeof setInterval> | null = null;
-
-export function startSimulation(intervalMs: number = 3000): void {
-  if (simulationInterval) return;
-
-  initializeSimulator();
-
-  console.log(`[Simulator] Starting continuous simulation (interval: ${intervalMs}ms)`);
-
-  // Generate events at the specified interval
-  simulationInterval = setInterval(async () => {
-    try {
-      // Generate 1-3 events per cycle
-      const eventCount = 1 + Math.floor(Math.random() * 2);
-      for (let i = 0; i < eventCount; i++) {
-        await generatePriceEvent();
-      }
-    } catch (error) {
-      console.error('[Simulator] Error generating event:', error);
-    }
-  }, intervalMs);
+export function startSimulation(): void {
+  // Disabled
 }
 
 export function stopSimulation(): void {
-  if (simulationInterval) {
-    clearInterval(simulationInterval);
-    simulationInterval = null;
-    console.log('[Simulator] Stopped');
-  }
+  // Disabled
 }

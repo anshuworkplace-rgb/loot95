@@ -9,7 +9,7 @@ import { Product, PriceEvent } from '../../shared/types.js';
 import { store } from '../store.js';
 import { processPriceEvent } from '../engine/pipeline.js';
 
-const RAPIDAPI_KEY = process.env.RAPIDAPI_KEY || '';
+const RAPIDAPI_KEY = process.env.RAPIDAPI_KEY || 'c1ff680d50msh57a77dea7bbca31p133f8ejsnaf685241d8df';
 const RAPIDAPI_HOST = process.env.RAPIDAPI_HOST || 'real-time-amazon-data.p.rapidapi.com';
 
 // Target electronics search queries for discovering real high-value deals across all categories
