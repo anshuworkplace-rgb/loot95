@@ -36,4 +36,4 @@ COPY --from=builder /app/server ./server
 
 EXPOSE 3001
 
-CMD ["npx", "tsx", "server/index.ts"]
+CMD ["node", "dist/server.js"]
