@@ -391,12 +391,31 @@ const PreferencesView: React.FC = () => {
           </div>
         )}
 
-        <button
-          onClick={handleSave}
-          style={{ padding: '14px 24px', background: 'var(--loot-green)', color: '#000', border: 'none', fontWeight: 800, fontSize: '0.85rem', borderRadius: 'var(--radius-sm)', cursor: 'pointer', fontFamily: 'var(--font-mono)', letterSpacing: '0.5px', boxShadow: '0 0 16px var(--loot-green-glow)' }}
-        >
-          ⚡ SAVE & APPLY 10X RADAR FILTERS
-        </button>
+        <div style={{ display: 'flex', gap: '12px' }}>
+          <button
+            onClick={handleSave}
+            style={{ flex: 1, padding: '14px 24px', background: 'var(--loot-green)', color: '#000', border: 'none', fontWeight: 800, fontSize: '0.85rem', borderRadius: 'var(--radius-sm)', cursor: 'pointer', fontFamily: 'var(--font-mono)', letterSpacing: '0.5px', boxShadow: '0 0 16px var(--loot-green-glow)' }}
+          >
+            ⚡ SAVE & APPLY 10X RADAR FILTERS
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              localStorage.removeItem('loot95_user_prefs');
+              setExcludeAccessories(true);
+              setMinDiscount('0');
+              setMinPrice('0');
+              setCategories({ smartphones: true, laptops: true, audio: true, tvs: true, gaming: true, appliances: true });
+              setBrands({ apple: true, sony: true, samsung: true, oneplus: true, lenovo: true, asus: true, lg: true });
+              setSavedStatus('🔄 ALL PREFERENCES RESET TO DEFAULT (SHOW ALL DEALS)');
+              setTimeout(() => setSavedStatus(''), 4000);
+            }}
+            style={{ padding: '14px 20px', background: 'rgba(239, 68, 68, 0.15)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.4)', fontWeight: 700, fontSize: '0.8rem', borderRadius: 'var(--radius-sm)', cursor: 'pointer', fontFamily: 'var(--font-mono)' }}
+          >
+            🔄 RESET ALL
+          </button>
+        </div>
       </div>
     </div>
   );

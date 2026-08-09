@@ -71,11 +71,14 @@ export const LiveRadar: React.FC<LiveRadarProps> = ({
         }
       }
 
-      // Brand Filter
+      // Brand Filter (only filter if at least one brand is actively enabled)
       if (userPrefs.brands) {
-        const brandKey = deal.product.brand.toLowerCase();
-        if (userPrefs.brands[brandKey] === false) {
-          return false;
+        const hasAnyBrandChecked = Object.values(userPrefs.brands).some(v => v === true);
+        if (hasAnyBrandChecked) {
+          const brandKey = deal.product.brand.toLowerCase();
+          if (userPrefs.brands[brandKey] === false) {
+            return false;
+          }
         }
       }
     }
