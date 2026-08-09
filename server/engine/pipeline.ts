@@ -49,8 +49,12 @@ export async function processPriceEvent(product: Product, priceEvent: PriceEvent
   }
   store.setStats(product.id, allStats);
 
-  // Use 30d stats as primary if sufficient history exists (>= 5 data points)
-  const hasSufficientHistory = primaryStats && primaryStats.sampleCount >= 5;
+  // Use 30d stats as primary, fall back to any available
+  const primaryStats = allStats.find(s => s.period === '30d')
+    || allStats.find(s => s.period === '90d')
+    || allStats[0] || null;
+
+  const hasSufficientHistory = primaryStats ? primaryStats.sampleCount >= 5 : false;
 
   // ─── DETERMINE NORMAL PRICE ───────────────────────────────
   // If historical median exists and differs from effective price, use it.

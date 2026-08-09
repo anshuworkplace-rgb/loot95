@@ -8,7 +8,7 @@
     "server": "tsx server/index.ts",
     "dev:all": "concurrently \"npm run server\" \"npm run dev\"",
     "setup": "node scripts/setup-production.js",
-    "build": "tsc -b && vite build && esbuild server/index.ts --bundle --platform=node --format=esm --outfile=dist/server.js --external:express --external:cors --external:@google/genai --external:dotenv",
+    "build": "tsc -b && vite build && esbuild server/index.ts --bundle --platform=node --packages=external --format=esm --outfile=dist/server.js",
     "lint": "oxlint",
     "preview": "vite preview"
   },
