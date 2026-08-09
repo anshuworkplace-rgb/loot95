@@ -146,15 +146,13 @@ export const DealDetail: React.FC<DealDetailProps> = ({ deal, onBack }) => {
       <div className="detail-section">
         <h3>LOOT INTELLIGENCE SCORE BREAKDOWN</h3>
         <div className="score-breakdown">
-          <ScoreComponentRow name="Historical Price Deviation" value={scoreComponents.historicalDeviation} />
-          <ScoreComponentRow name="Historical Rarity" value={scoreComponents.historicalRarity} />
-          <ScoreComponentRow name="Discount vs Normal Price" value={scoreComponents.discountVsNormal} />
-          <ScoreComponentRow name="Discount vs Historical Median" value={scoreComponents.discountVsMedian} />
-          <ScoreComponentRow name="Discount vs Historical Minimum" value={scoreComponents.discountVsMin} />
+          <ScoreComponentRow name="Historical Low Gap (ATL Bonus)" value={scoreComponents.historicalLowGap} />
+          <ScoreComponentRow name="Drop vs 90-Day Average Price" value={scoreComponents.dropVsAverage} />
+          <ScoreComponentRow name="Historical Rarity Index" value={scoreComponents.historicalRarity} />
           <ScoreComponentRow name="Price Drop Velocity" value={scoreComponents.priceVelocity} />
-          <ScoreComponentRow name="Seller Reliability" value={scoreComponents.sellerReliability} />
+          <ScoreComponentRow name="Seller Trust & Quality Score" value={scoreComponents.sellerTrustScore} />
+          <ScoreComponentRow name="Bank & Coupon Instant Discount Bonus" value={scoreComponents.bankOfferBonus} />
           <ScoreComponentRow name="Stock Availability" value={scoreComponents.stockAvailability} />
-          <ScoreComponentRow name="Deal Frequency Inverse" value={scoreComponents.dealFrequencyInverse} />
           {scoreComponents.sleepingProductBonus > 0 && (
             <ScoreComponentRow name="Sleeping Product Bonus" value={scoreComponents.sleepingProductBonus} color="var(--loot-green)" />
           )}

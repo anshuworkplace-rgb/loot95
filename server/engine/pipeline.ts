@@ -139,7 +139,7 @@ export async function processPriceEvent(product: Product, priceEvent: PriceEvent
     anomaly, sleeping, neverSeen, realDiscountPct, normalPrice
   );
 
-  // ─── COMPUTE DEAL ANOMALY METRICS ───────────────────────
+  // ─── COMPUTE DEAL ANOMALY METRICS & METRIC TRIAD ─────────
   const aggregatorBaseline = await fetchAggregatedPriceBaseline(
     product.id,
     product.platform,
@@ -149,18 +149,24 @@ export async function processPriceEvent(product: Product, priceEvent: PriceEvent
     product.mrp
   );
 
+  product.averagePrice = aggregatorBaseline?.averageSellingPrice || primaryStats?.median || normalPrice;
+  product.allTimeLow = aggregatorBaseline?.allTimeLow || primaryStats?.min || Math.round(normalPrice * 0.70);
+
   const anomalyMetrics = computeDealAnomalyMetrics(
     product,
     priceEvent.effectivePrice,
     product.mrp,
     primaryStats,
-    aggregatorBaseline
+    aggregatorBaseline,
+    priceEvent.ingestedAt || new Date().toISOString()
   );
 
-  // Boost Loot Score using compositeDealScore if composite score is higher
-  if (anomalyMetrics.compositeDealScore > lootScore) {
-    lootScore = anomalyMetrics.compositeDealScore;
-  }
+  // Set Loot Score from composite deal score
+  lootScore = anomalyMetrics.compositeDealScore;
+
+  const isAllTimeLow = anomalyMetrics.isAllTimeLow;
+  realDiscountPct = Math.max(0, Math.round(anomalyMetrics.dropVsAveragePct));
+  const savingsVsAverage = anomalyMetrics.savingsVsAverage;
 
   // ─── CREATE DEAL EVENT ────────────────────────────────────
   const processingLatency = Date.now() - startTime;
@@ -177,12 +183,16 @@ export async function processPriceEvent(product: Product, priceEvent: PriceEvent
     confidence: Math.round(confidence * 100) / 100,
     confidenceReason,
     currentPrice: priceEvent.effectivePrice,
-    normalPrice: Math.round(normalPrice),
-    historicalMedian: Math.round(historicalMedian),
-    historicalLow: Math.round(historicalLow),
+    effectivePrice: anomalyMetrics.effectivePrice,
+    normalPrice: Math.round(product.averagePrice),
+    historicalMedian: Math.round(product.averagePrice),
+    historicalLow: Math.round(product.allTimeLow),
+    isAllTimeLow,
     realDiscountPct,
     displayedDiscountPct: Math.round(mrpDiscount),
+    savingsVsAverage,
     detectedAt: new Date().toISOString(),
+    ageMinutes: anomalyMetrics.ageMinutes,
     detectionLatencyMs: processingLatency,
     isActive: true,
     expiresAt: null,

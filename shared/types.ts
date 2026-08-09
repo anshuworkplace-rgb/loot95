@@ -5,7 +5,16 @@
 
 // ─── Platform & Enums ─────────────────────────────────────────
 
-export type Platform = 'amazon' | 'flipkart' | 'myntra' | 'croma' | 'ajio' | 'nykaa';
+export type Platform = 
+  | 'amazon' 
+  | 'flipkart' 
+  | 'myntra' 
+  | 'croma' 
+  | 'ajio' 
+  | 'reliance_digital' 
+  | 'pepperfry' 
+  | 'nykaa' 
+  | 'tatacliq';
 
 export type DealClassification = 'NORMAL' | 'GREAT' | 'HOT' | 'EXTREME' | 'LOOT_95' | 'PRICE_ERROR';
 
@@ -27,6 +36,7 @@ export interface Product {
   id: string;
   asin?: string;
   fsid?: string;
+  sku?: string;
   brand: string;
   model: string;
   title: string;
@@ -39,8 +49,12 @@ export interface Product {
   mrp: number;
   currentPrice: number;
   effectivePrice: number;
+  averagePrice: number;
+  allTimeLow: number;
   sellerName: string;
   sellerRating: number;
+  isSellerTrusted: boolean;
+  isRefurbishedOrUsed: boolean;
   stockStatus: 'in_stock' | 'low_stock' | 'out_of_stock';
   verifiedLive?: boolean;
   sourceName?: string;
@@ -50,6 +64,7 @@ export interface Product {
   couponCode?: string;
   bankOfferRequired: boolean;
   bankOfferDetails?: string;
+  instantDiscountAmount: number;
   specifications: Record<string, string>;
   lastCheckedAt: string;
   createdAt: string;
@@ -103,32 +118,37 @@ export interface PriceHistoryPoint {
 // ─── Score Components ─────────────────────────────────────────
 
 export interface LootScoreComponents {
-  historicalDeviation: number;    // 0-100: How far below historical median
+  historicalLowGap: number;      // 0-100: Points for being at or below All-Time Low (ATL)
+  dropVsAverage: number;         // 0-100: % drop below 90-day Average Selling Price (ASP)
   historicalRarity: number;       // 0-100: Percentile rarity in price distribution
-  discountVsNormal: number;      // 0-100: Discount vs normal selling price
-  discountVsMedian: number;      // 0-100: Discount vs historical median
-  discountVsMin: number;         // 0-100: Discount vs historical minimum
   crossPlatformDiff: number;     // 0-100: Price gap vs other platforms
-  priceVelocity: number;         // 0-100: Speed of price drop
-  sellerReliability: number;     // 0-100: Seller trustworthiness
-  stockAvailability: number;     // 0-100: Is it actually available?
-  dealFrequencyInverse: number;  // 0-100: How rarely does this product discount?
+  priceVelocity: number;         // 0-100: Speed of sudden price crash
+  sellerTrustScore: number;      // 0-100: Seller trustworthiness & new item shield
+  bankOfferBonus: number;        // 0-100: Extra savings from instant bank offers/coupons
   sleepingProductBonus: number;  // 0-100: Stable-price product sudden drop
-  conditionPenalty: number;      // 0-100 negative: Coupon/bank-offer dependency
+  stockAvailability: number;     // 0-100: Is it actually available?
+  timeDecayPenalty: number;      // 0-100 negative: Penalty for aging deals
   disappearanceProbability: number; // 0-100: Likely to vanish?
   confidenceAdjustment: number;  // 0-1: Scale by data confidence
 }
 
 export interface DealAnomalyMetrics {
-  normalPrice: number;
+  normalPrice: number;           // 90-day Average Selling Price (ASP)
+  allTimeLow: number;            // All-Time Low (ATL)
   typicalLowestPrice: number;
   currentPrice: number;
+  effectivePrice: number;        // Price after instant bank/coupon discount
+  isAllTimeLow: boolean;
+  dropVsAveragePct: number;      // % lower than 90-day average
+  savingsVsAverage: number;      // ₹ saved compared to normal price
   historicalPercentile: number;
-  rarityLabel: 'VERY HIGH' | 'HIGH' | 'MODERATE' | 'LOW';
+  rarityLabel: 'ALL-TIME LOW' | 'VERY HIGH' | 'HIGH' | 'MODERATE' | 'LOW';
   priceAnomalyScore: number;
   demandLabel: 'EXTREME' | 'HIGH' | 'MODERATE' | 'NORMAL';
   sellerConfidenceLabel: 'VERY HIGH' | 'HIGH' | 'MODERATE' | 'LOW';
   compositeDealScore: number;
+  timeDecayMultiplier: number;
+  ageMinutes: number;
 }
 
 // ─── Deal Event ───────────────────────────────────────────────
@@ -145,12 +165,16 @@ export interface DealEvent {
   confidence: number;
   confidenceReason: string;
   currentPrice: number;
-  normalPrice: number;
+  effectivePrice: number;
+  normalPrice: number;           // 90-Day Average Selling Price (ASP)
   historicalMedian: number;
-  historicalLow: number;
-  realDiscountPct: number;
-  displayedDiscountPct: number;
+  historicalLow: number;          // All-Time Low (ATL)
+  isAllTimeLow: boolean;
+  realDiscountPct: number;       // % drop vs Average Price (NOT MRP)
+  displayedDiscountPct: number;  // % drop vs MRP
+  savingsVsAverage: number;      // Absolute rupee savings vs ASP
   detectedAt: string;
+  ageMinutes: number;
   detectionLatencyMs: number;
   isActive: boolean;
   expiresAt: string | null;

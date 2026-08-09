@@ -380,80 +380,110 @@ export function isNeverSeenBefore(
   return { result: false, message: '' };
 }
 
-// ─── Deal Anomaly Metrics Calculator ──────────────────────────
+// ─── Deal Anomaly Metrics Calculator (Core Metric Triad & 10 Backend Features) ───
 
 export function computeDealAnomalyMetrics(
   product: Product,
   currentPrice: number,
   mrp: number,
   stats: PriceStatistics | null,
-  aggregatorBaseline: AggregatedPriceBaseline | null
+  aggregatorBaseline: AggregatedPriceBaseline | null,
+  detectedAt?: string
 ): DealAnomalyMetrics {
-  const normalPrice = aggregatorBaseline?.averageSellingPrice || stats?.median || mrp;
-  const typicalLowestPrice = aggregatorBaseline?.typicalLowestPrice || aggregatorBaseline?.allTimeLow || stats?.min || Math.round(normalPrice * 0.80);
+  // Core Metric 1 & 2: Normal Price (90-Day Average Selling Price) & All-Time Low (ATL)
+  const normalPrice = product.averagePrice || aggregatorBaseline?.averageSellingPrice || stats?.median || (mrp ? Math.round(mrp * 0.75) : currentPrice);
+  const allTimeLow = product.allTimeLow || aggregatorBaseline?.allTimeLow || stats?.min || Math.round(normalPrice * 0.70);
+  const typicalLowestPrice = aggregatorBaseline?.typicalLowestPrice || Math.min(allTimeLow, Math.round(normalPrice * 0.80));
+
+  const effectivePrice = product.effectivePrice || (product.instantDiscountAmount ? currentPrice - product.instantDiscountAmount : currentPrice);
+
+  // Core Metric 3: All-Time Low check & Drop vs Average %
+  const isAllTimeLow = currentPrice <= allTimeLow || effectivePrice <= allTimeLow;
+  const dropVsAveragePct = Math.max(0, Math.round(((normalPrice - effectivePrice) / normalPrice) * 100 * 10) / 10);
+  const savingsVsAverage = Math.max(0, Math.round(normalPrice - effectivePrice));
+
+  // Time Decay Calculation (Feature 10): e^(-0.004 * ageMinutes)
+  const detectedTime = detectedAt ? new Date(detectedAt).getTime() : Date.now();
+  const ageMinutes = Math.max(0, Math.round((Date.now() - detectedTime) / 60000));
+  const timeDecayMultiplier = Math.max(0.2, Math.exp(-0.004 * ageMinutes)); // 60 mins -> ~0.78, 180 mins -> ~0.48
 
   // Calculate Historical Percentile
   let historicalPercentile = 50.0;
   const points = aggregatorBaseline?.pricePoints || [];
 
   if (points.length > 0) {
-    const countBelow = points.filter(p => p <= currentPrice).length;
+    const countBelow = points.filter(p => p <= effectivePrice).length;
     historicalPercentile = Math.max(0.1, Math.min(99.9, Math.round((countBelow / points.length) * 100 * 10) / 10));
   } else {
-    const dropBelowLowRatio = (typicalLowestPrice - currentPrice) / (typicalLowestPrice || 1);
-    if (dropBelowLowRatio > 0.3) historicalPercentile = 0.8;
-    else if (dropBelowLowRatio > 0.15) historicalPercentile = 1.2;
-    else if (dropBelowLowRatio > 0) historicalPercentile = 4.5;
-    else historicalPercentile = Math.round((currentPrice / normalPrice) * 100 * 10) / 10;
+    if (isAllTimeLow) historicalPercentile = 0.5;
+    else if (dropVsAveragePct >= 40) historicalPercentile = 2.0;
+    else if (dropVsAveragePct >= 25) historicalPercentile = 8.0;
+    else historicalPercentile = Math.max(1.0, Math.round((100 - dropVsAveragePct) * 10) / 10);
   }
 
   // Rarity Label
-  let rarityLabel: 'VERY HIGH' | 'HIGH' | 'MODERATE' | 'LOW' = 'LOW';
-  if (historicalPercentile <= 3.0) rarityLabel = 'VERY HIGH';
-  else if (historicalPercentile <= 10.0) rarityLabel = 'HIGH';
-  else if (historicalPercentile <= 25.0) rarityLabel = 'MODERATE';
+  let rarityLabel: 'ALL-TIME LOW' | 'VERY HIGH' | 'HIGH' | 'MODERATE' | 'LOW' = 'LOW';
+  if (isAllTimeLow) rarityLabel = 'ALL-TIME LOW';
+  else if (historicalPercentile <= 3.0 || dropVsAveragePct >= 35) rarityLabel = 'VERY HIGH';
+  else if (historicalPercentile <= 10.0 || dropVsAveragePct >= 20) rarityLabel = 'HIGH';
+  else if (historicalPercentile <= 25.0 || dropVsAveragePct >= 10) rarityLabel = 'MODERATE';
 
   // Price Anomaly Score (0-100)
   let priceAnomalyScore = 50;
-  const dropVsTypical = (typicalLowestPrice - currentPrice) / (typicalLowestPrice || 1);
-  const dropVsNormal = (normalPrice - currentPrice) / (normalPrice || 1);
-
-  if (currentPrice < typicalLowestPrice) {
-    priceAnomalyScore = Math.min(99, Math.round(80 + dropVsTypical * 40));
+  if (isAllTimeLow) {
+    const dropBelowAtl = (allTimeLow - effectivePrice) / (allTimeLow || 1);
+    priceAnomalyScore = Math.min(99, Math.round(90 + dropBelowAtl * 50));
   } else {
-    priceAnomalyScore = Math.max(10, Math.round(dropVsNormal * 100));
+    priceAnomalyScore = Math.max(10, Math.round(dropVsAveragePct * 1.8));
   }
 
   // Demand Label
   let demandLabel: 'EXTREME' | 'HIGH' | 'MODERATE' | 'NORMAL' = 'NORMAL';
-  if (dropVsNormal >= 0.5 || dropVsTypical >= 0.25) demandLabel = 'EXTREME';
-  else if (dropVsNormal >= 0.35 || dropVsTypical >= 0.1) demandLabel = 'HIGH';
-  else if (dropVsNormal >= 0.20) demandLabel = 'MODERATE';
+  if (isAllTimeLow || dropVsAveragePct >= 40) demandLabel = 'EXTREME';
+  else if (dropVsAveragePct >= 25) demandLabel = 'HIGH';
+  else if (dropVsAveragePct >= 15) demandLabel = 'MODERATE';
 
-  // Seller Confidence Label
+  // Seller Confidence Label (Feature 3: Seller Trust Shield)
   let sellerConfidenceLabel: 'VERY HIGH' | 'HIGH' | 'MODERATE' | 'LOW' = 'HIGH';
-  if (product.verifiedLive && product.sellerRating >= 4.5) sellerConfidenceLabel = 'VERY HIGH';
-  else if (product.sellerRating >= 4.0) sellerConfidenceLabel = 'HIGH';
-  else if (product.sellerRating >= 3.5) sellerConfidenceLabel = 'MODERATE';
-  else sellerConfidenceLabel = 'LOW';
+  if (product.isRefurbishedOrUsed) {
+    sellerConfidenceLabel = 'LOW';
+  } else if (product.verifiedLive && product.isSellerTrusted && product.sellerRating >= 4.5) {
+    sellerConfidenceLabel = 'VERY HIGH';
+  } else if (product.sellerRating >= 4.0) {
+    sellerConfidenceLabel = 'HIGH';
+  } else if (product.sellerRating >= 3.5) {
+    sellerConfidenceLabel = 'MODERATE';
+  } else {
+    sellerConfidenceLabel = 'LOW';
+  }
 
-  // Composite Deal Score (0-100, e.g. 97.8)
-  const scoreComponent1 = priceAnomalyScore * 0.45;
-  const scoreComponent2 = (100 - historicalPercentile) * 0.35;
-  const scoreComponent3 = Math.min(100, Math.max(0, dropVsNormal * 100)) * 0.20;
+  // Composite Deal Score (0-100, e.g. 96.5)
+  const atlBonus = isAllTimeLow ? 35 : 0;
+  const dropComponent = Math.min(45, dropVsAveragePct * 0.9);
+  const rarityComponent = (100 - historicalPercentile) * 0.20;
+  const trustComponent = product.isRefurbishedOrUsed ? -25 : (product.isSellerTrusted ? 5 : 0);
 
-  const rawComposite = scoreComponent1 + scoreComponent2 + scoreComponent3;
-  const compositeDealScore = Math.round(Math.min(99.9, Math.max(10.0, rawComposite)) * 10) / 10;
+  const rawComposite = (priceAnomalyScore * 0.35) + dropComponent + atlBonus + rarityComponent + trustComponent;
+  const timeDecayedScore = rawComposite * timeDecayMultiplier;
+  const compositeDealScore = Math.round(Math.min(99.9, Math.max(10.0, timeDecayedScore)) * 10) / 10;
 
   return {
     normalPrice,
+    allTimeLow,
     typicalLowestPrice,
     currentPrice,
+    effectivePrice,
+    isAllTimeLow,
+    dropVsAveragePct,
+    savingsVsAverage,
     historicalPercentile,
     rarityLabel,
     priceAnomalyScore,
     demandLabel,
     sellerConfidenceLabel,
     compositeDealScore,
+    timeDecayMultiplier: Math.round(timeDecayMultiplier * 100) / 100,
+    ageMinutes,
   };
 }
+

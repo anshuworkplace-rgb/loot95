@@ -31,14 +31,21 @@ export const DealCard: React.FC<DealCardProps> = ({ deal, onSelect }) => {
   // Fallback calculations for anomaly metrics if missing
   const anomaly = anomalyMetrics || {
     normalPrice: normalPrice,
+    allTimeLow: deal.historicalLow || Math.round(normalPrice * 0.70),
     typicalLowestPrice: deal.historicalLow || Math.round(normalPrice * 0.82),
     currentPrice: currentPrice,
+    effectivePrice: deal.effectivePrice || currentPrice,
+    isAllTimeLow: deal.isAllTimeLow || false,
+    dropVsAveragePct: realDiscountPct,
+    savingsVsAverage: deal.savingsVsAverage || 0,
     historicalPercentile: Math.max(0.8, Math.round((1 - realDiscountPct / 100) * 12 * 10) / 10),
-    rarityLabel: realDiscountPct >= 50 ? 'VERY HIGH' : realDiscountPct >= 30 ? 'HIGH' : 'MODERATE',
+    rarityLabel: deal.isAllTimeLow ? 'ALL-TIME LOW' as const : realDiscountPct >= 50 ? 'VERY HIGH' as const : realDiscountPct >= 30 ? 'HIGH' as const : 'MODERATE' as const,
     priceAnomalyScore: Math.min(99, Math.round(55 + realDiscountPct * 0.45)),
-    demandLabel: realDiscountPct >= 40 ? 'HIGH' : 'NORMAL',
-    sellerConfidenceLabel: product.verifiedLive ? 'HIGH' : 'MODERATE',
+    demandLabel: realDiscountPct >= 40 ? 'HIGH' as const : 'NORMAL' as const,
+    sellerConfidenceLabel: product.verifiedLive ? 'HIGH' as const : 'MODERATE' as const,
     compositeDealScore: lootScore,
+    timeDecayMultiplier: 1.0,
+    ageMinutes: deal.ageMinutes || 0,
   };
 
   return (
@@ -48,41 +55,66 @@ export const DealCard: React.FC<DealCardProps> = ({ deal, onSelect }) => {
           <span className={`deal-badge ${classification}`}>
             {classification.replace('_', ' ')}
           </span>
-          <span className="deal-brand">{product.brand}</span>
-          {product.sourceName && (
-            <span className="deal-source-badge">
-              📡 {product.sourceName}
+          {deal.isAllTimeLow && (
+            <span style={{
+              background: 'linear-gradient(90deg, #06b6d4, #3b82f6)',
+              color: '#000',
+              fontWeight: 800,
+              fontSize: '0.68rem',
+              padding: '3px 8px',
+              borderRadius: '4px',
+              letterSpacing: '0.5px',
+              boxShadow: '0 0 10px rgba(6, 182, 212, 0.5)',
+            }}>
+              🔥 ALL-TIME LOW
             </span>
           )}
+          <span className="deal-brand">{product.brand}</span>
+          <span className="deal-source-badge" style={{ textTransform: 'uppercase' }}>
+            🛒 {product.platform}
+          </span>
         </div>
 
         <div className="deal-title">{product.title}</div>
 
-        <div className="deal-price-row">
-          <span className="deal-current-price">{formatPrice(currentPrice)}</span>
+        <div className="deal-price-row" style={{ flexWrap: 'wrap', gap: '8px', alignItems: 'baseline' }}>
+          <span className="deal-current-price">{formatPrice(deal.effectivePrice || currentPrice)}</span>
           {normalPrice > currentPrice && (
-            <span className="deal-original-price">{formatPrice(normalPrice)}</span>
+            <span className="deal-original-price" title="90-Day Average Selling Price">
+              Avg: {formatPrice(normalPrice)}
+            </span>
           )}
           {realDiscountPct > 0 ? (
-            <span className="deal-discount">
-              {realDiscountPct}% REAL OFF
+            <span className="deal-discount" style={{ background: 'rgba(16, 185, 129, 0.2)', color: 'var(--loot-green)' }}>
+              {realDiscountPct}% BELOW AVG PRICE
             </span>
           ) : (
             <span style={{ fontSize: '0.75rem', padding: '2px 6px', background: 'rgba(255,255,255,0.06)', color: 'var(--text-muted)', borderRadius: '4px' }}>
               REGULAR PRICE
             </span>
           )}
+          {deal.savingsVsAverage > 0 && (
+            <span style={{ fontSize: '0.72rem', color: 'var(--loot-green)', fontWeight: 700 }}>
+              (Save {formatPrice(deal.savingsVsAverage)})
+            </span>
+          )}
           {displayedDiscountPct > realDiscountPct && displayedDiscountPct > 0 && (
-            <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+            <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>
               ({displayedDiscountPct}% MRP OFF)
             </span>
           )}
         </div>
 
+        {product.instantDiscountAmount > 0 && (
+          <div style={{ fontSize: '0.72rem', color: 'var(--accent-cyan)', marginTop: '2px', fontWeight: 600 }}>
+            💳 Bank Offer: Less {formatPrice(product.instantDiscountAmount)} instant checkout discount
+          </div>
+        )}
+
         {/* ─── Deal Anomaly Score Panel ──────────────────────────────── */}
         <div className="deal-anomaly-card">
           <div className="anomaly-header">
-            <span className="anomaly-title">⚡ DEAL ANOMALY METRICS</span>
+            <span className="anomaly-title">⚡ REAL DEAL METRIC TRIAD</span>
             <span className="anomaly-score-badge">
               DEAL SCORE: <strong>{anomaly.compositeDealScore.toFixed(1)}/100</strong>
             </span>
@@ -90,39 +122,30 @@ export const DealCard: React.FC<DealCardProps> = ({ deal, onSelect }) => {
 
           <div className="anomaly-table">
             <div className="anomaly-cell">
-              <span className="cell-label">Normal price</span>
+              <span className="cell-label">90-Day Avg Price</span>
               <span className="cell-value">{formatPrice(anomaly.normalPrice)}</span>
             </div>
             <div className="anomaly-cell">
-              <span className="cell-label">Typical lowest price</span>
-              <span className="cell-value highlight-lowest">{formatPrice(anomaly.typicalLowestPrice)}</span>
+              <span className="cell-label">All-Time Low (ATL)</span>
+              <span className="cell-value highlight-lowest">{formatPrice(anomaly.allTimeLow || anomaly.typicalLowestPrice)}</span>
             </div>
             <div className="anomaly-cell">
-              <span className="cell-label">Current price</span>
-              <span className="cell-value highlight-current">{formatPrice(anomaly.currentPrice)}</span>
+              <span className="cell-label">Current Live Price</span>
+              <span className="cell-value highlight-current">{formatPrice(anomaly.effectivePrice || anomaly.currentPrice)}</span>
             </div>
 
             <div className="anomaly-cell">
-              <span className="cell-label">Historical percentile</span>
+              <span className="cell-label">Historical Percentile</span>
               <span className="cell-value highlight-percentile">{anomaly.historicalPercentile}%</span>
             </div>
             <div className="anomaly-cell">
-              <span className="cell-label">Rarity</span>
-              <span className={`rarity-pill rarity-${anomaly.rarityLabel.toLowerCase().replace(' ', '-')}`}>
+              <span className="cell-label">Rarity Metric</span>
+              <span className={`rarity-pill rarity-${(anomaly.rarityLabel || 'HIGH').toLowerCase().replace(/\s+/g, '-')}`}>
                 {anomaly.rarityLabel}
               </span>
             </div>
             <div className="anomaly-cell">
-              <span className="cell-label">Price anomaly</span>
-              <span className="cell-value">{anomaly.priceAnomalyScore}/100</span>
-            </div>
-
-            <div className="anomaly-cell">
-              <span className="cell-label">Demand</span>
-              <span className="cell-value">{anomaly.demandLabel}</span>
-            </div>
-            <div className="anomaly-cell">
-              <span className="cell-label">Seller confidence</span>
+              <span className="cell-label">Seller Confidence</span>
               <span className="cell-value">{anomaly.sellerConfidenceLabel}</span>
             </div>
           </div>
@@ -130,7 +153,7 @@ export const DealCard: React.FC<DealCardProps> = ({ deal, onSelect }) => {
 
         <div className="deal-meta" style={{ marginTop: '8px' }}>
           <span className="deal-meta-item">
-            🛒 {product.sellerName || 'Amazon'}
+            🏪 {product.sellerName || product.platform}
           </span>
           <span className="deal-meta-item">
             ⭐ {product.rating.toFixed(1)} ({product.reviewCount} reviews)
@@ -138,11 +161,6 @@ export const DealCard: React.FC<DealCardProps> = ({ deal, onSelect }) => {
           {product.stockStatus === 'low_stock' && (
             <span className="deal-meta-item" style={{ color: 'var(--accent-orange)' }}>
               ⚠️ Low Stock
-            </span>
-          )}
-          {product.couponRequired && (
-            <span className="deal-meta-item" style={{ color: 'var(--accent-cyan)' }}>
-              🎟️ Coupon Required
             </span>
           )}
         </div>
@@ -165,7 +183,7 @@ export const DealCard: React.FC<DealCardProps> = ({ deal, onSelect }) => {
 
         <div style={{ textAlign: 'right', marginTop: 'auto' }}>
           <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
-            HIST. LOW: <strong style={{ color: 'var(--accent-cyan)' }}>{formatPrice(anomaly.typicalLowestPrice)}</strong>
+            ATL LOW: <strong style={{ color: 'var(--accent-cyan)' }}>{formatPrice(anomaly.allTimeLow || anomaly.typicalLowestPrice)}</strong>
           </div>
           <div className="deal-timing">⚡ {formatTimeAgo(detectedAt)}</div>
         </div>
@@ -173,3 +191,4 @@ export const DealCard: React.FC<DealCardProps> = ({ deal, onSelect }) => {
     </div>
   );
 };
+

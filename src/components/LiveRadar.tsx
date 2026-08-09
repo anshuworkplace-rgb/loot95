@@ -21,6 +21,8 @@ export const LiveRadar: React.FC<LiveRadarProps> = ({
   onFilterChange,
 }) => {
   const [categoryFilter, setCategoryFilter] = useState<string>('ALL');
+  const [platformFilter, setPlatformFilter] = useState<string>('ALL');
+  const [sortBy, setSortBy] = useState<'SCORE' | 'ATL' | 'SAVINGS' | 'NEWEST'>('SCORE');
 
   const JUNK_ACCESSORY_KEYWORDS = [
     'back cover', 'phone case', 'silicone case', 'silicone cover', 'tempered glass',
@@ -28,21 +30,41 @@ export const LiveRadar: React.FC<LiveRadarProps> = ({
     'pouch case', 'watch strap', 'phone stand', 'screen guard'
   ];
 
-  // Read saved user preferences from localStorage
   const savedPrefsRaw = typeof window !== 'undefined' ? localStorage.getItem('loot95_user_prefs') : null;
   const userPrefs = savedPrefsRaw ? JSON.parse(savedPrefsRaw) : null;
 
+  const platforms = [
+    { id: 'ALL', label: '🌐 All Stores' },
+    { id: 'amazon', label: 'Amazon India' },
+    { id: 'flipkart', label: 'Flipkart' },
+    { id: 'myntra', label: 'Myntra' },
+    { id: 'croma', label: 'Croma' },
+    { id: 'reliance_digital', label: 'Reliance Digital' },
+    { id: 'ajio', label: 'Ajio' },
+    { id: 'tatacliq', label: 'Tata CLiQ' },
+    { id: 'nykaa', label: 'Nykaa' },
+    { id: 'pepperfry', label: 'Pepperfry' },
+  ];
+
   // Filter deals
-  const filteredDeals = deals.filter(deal => {
+  let filteredDeals = deals.filter(deal => {
+    // Platform Filter
+    if (platformFilter !== 'ALL' && deal.product.platform !== platformFilter) {
+      return false;
+    }
+
     // IF NO_FILTER TAB IS ACTIVE, BYPASS ALL FILTERS
     if (activeFilter === 'NO_FILTER') {
       return true;
     }
 
     // Classification filter
-    if (activeFilter !== 'ALL' && deal.classification !== activeFilter) {
+    if (activeFilter === 'ATL_ONLY') {
+      if (!deal.isAllTimeLow) return false;
+    } else if (activeFilter !== 'ALL' && deal.classification !== activeFilter) {
       return false;
     }
+
     // Category filter
     if (!categoryFilter.startsWith('ALL') && deal.product.subcategory !== categoryFilter) {
       return false;
@@ -70,20 +92,23 @@ export const LiveRadar: React.FC<LiveRadarProps> = ({
           return false;
         }
       }
-
-      // Brand Filter (only filter if at least one brand is actively enabled)
-      if (userPrefs.brands) {
-        const hasAnyBrandChecked = Object.values(userPrefs.brands).some(v => v === true);
-        if (hasAnyBrandChecked) {
-          const brandKey = deal.product.brand.toLowerCase();
-          if (userPrefs.brands[brandKey] === false) {
-            return false;
-          }
-        }
-      }
     }
 
     return true;
+  });
+
+  // Sort deals
+  filteredDeals = [...filteredDeals].sort((a, b) => {
+    if (sortBy === 'ATL') {
+      if (a.isAllTimeLow && !b.isAllTimeLow) return -1;
+      if (!a.isAllTimeLow && b.isAllTimeLow) return 1;
+      return b.lootScore - a.lootScore;
+    } else if (sortBy === 'SAVINGS') {
+      return b.savingsVsAverage - a.savingsVsAverage;
+    } else if (sortBy === 'NEWEST') {
+      return new Date(b.detectedAt).getTime() - new Date(a.detectedAt).getTime();
+    }
+    return b.lootScore - a.lootScore;
   });
 
   const categories = ['ALL (NO FILTER)', 'Smartphones', 'Headphones', 'Earbuds', 'Laptops', 'Tablets', 'TVs', 'Cameras', 'Smartwatches', 'Gaming', 'Appliances'];
@@ -92,55 +117,104 @@ export const LiveRadar: React.FC<LiveRadarProps> = ({
     <div className="deal-feed">
       <div className="feed-header">
         <div>
-          <h2>LIVE DEAL RADAR</h2>
+          <h2>LIVE MULTI-PLATFORM DEAL RADAR</h2>
           <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-            Real-time feed • Auto-updating via Server-Sent Events
+            Direct Intelligence across 7+ Indian Stores • Real-time SSE Stream
           </span>
         </div>
 
-        <div className="feed-filters">
-          {['ALL', 'NO_FILTER', 'LOOT_95', 'EXTREME', 'HOT', 'GREAT'].map(filter => (
+        <div className="feed-filters" style={{ flexWrap: 'wrap', gap: '6px' }}>
+          {['ALL', 'ATL_ONLY', 'LOOT_95', 'EXTREME', 'HOT', 'NO_FILTER'].map(filter => (
             <button
               key={filter}
               className={`filter-btn ${activeFilter === filter ? 'active' : ''}`}
               onClick={() => onFilterChange(filter)}
-              style={filter === 'NO_FILTER' ? { border: '1px solid var(--accent-cyan)', color: 'var(--accent-cyan)' } : {}}
+              style={filter === 'ATL_ONLY' ? { border: '1px solid var(--accent-cyan)', color: 'var(--accent-cyan)', fontWeight: 800 } : {}}
             >
-              {filter === 'NO_FILTER' ? '🔓 NO FILTER (RAW)' : filter.replace('_', ' ')}
+              {filter === 'ATL_ONLY' ? '🔥 ALL-TIME LOWS' : filter === 'NO_FILTER' ? '🔓 RAW FEED' : filter.replace('_', ' ')}
             </button>
           ))}
         </div>
       </div>
 
-      {/* Secondary Category Filters */}
-      <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '8px', marginBottom: '8px' }}>
-        {categories.map(cat => (
+      {/* 7+ Platform Filter Bar */}
+      <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '6px', marginBottom: '8px' }}>
+        {platforms.map(p => (
           <button
-            key={cat}
-            onClick={() => setCategoryFilter(cat)}
+            key={p.id}
+            onClick={() => setPlatformFilter(p.id)}
             style={{
-              padding: '4px 10px',
-              fontSize: '0.7rem',
-              fontFamily: 'var(--font-sans)',
+              padding: '6px 12px',
+              fontSize: '0.72rem',
+              fontWeight: 700,
+              fontFamily: 'var(--font-mono)',
               borderRadius: 'var(--radius-sm)',
-              border: '1px solid var(--border-subtle)',
-              background: categoryFilter === cat ? 'var(--bg-elevated)' : 'transparent',
-              color: categoryFilter === cat ? 'var(--text-primary)' : 'var(--text-muted)',
+              border: platformFilter === p.id ? '1px solid var(--loot-green)' : '1px solid var(--border-subtle)',
+              background: platformFilter === p.id ? 'rgba(16, 185, 129, 0.15)' : 'var(--bg-surface)',
+              color: platformFilter === p.id ? 'var(--loot-green)' : 'var(--text-secondary)',
               cursor: 'pointer',
               whiteSpace: 'nowrap',
             }}
           >
-            {cat}
+            {p.label}
           </button>
         ))}
+      </div>
+
+      {/* Secondary Category & Sorting Controls */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap', gap: '8px' }}>
+        <div style={{ display: 'flex', gap: '6px', overflowX: 'auto' }}>
+          {categories.map(cat => (
+            <button
+              key={cat}
+              onClick={() => setCategoryFilter(cat)}
+              style={{
+                padding: '4px 10px',
+                fontSize: '0.7rem',
+                fontFamily: 'var(--font-sans)',
+                borderRadius: 'var(--radius-sm)',
+                border: '1px solid var(--border-subtle)',
+                background: categoryFilter === cat ? 'var(--bg-elevated)' : 'transparent',
+                color: categoryFilter === cat ? 'var(--text-primary)' : 'var(--text-muted)',
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {cat}
+            </button>
+          ))}
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+          <span>SORT BY:</span>
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as any)}
+            style={{
+              background: 'var(--bg-surface)',
+              border: '1px solid var(--border-subtle)',
+              color: 'var(--text-primary)',
+              padding: '4px 8px',
+              borderRadius: 'var(--radius-sm)',
+              fontSize: '0.72rem',
+              fontFamily: 'var(--font-mono)',
+              cursor: 'pointer',
+            }}
+          >
+            <option value="SCORE">⚡ Highest Deal Score</option>
+            <option value="ATL">🔥 All-Time Lows First</option>
+            <option value="SAVINGS">💰 Max ₹ Saved vs Avg</option>
+            <option value="NEWEST">⏱️ Freshness (Newest)</option>
+          </select>
+        </div>
       </div>
 
       {/* Feed list */}
       {filteredDeals.length === 0 ? (
         <div className="empty-state">
           <div className="icon">📡</div>
-          <h3>Scanning for {activeFilter !== 'ALL' ? activeFilter : ''} Deals...</h3>
-          <p>The intelligence engine is continuously monitoring Indian e-commerce platforms. High-value deals will appear here in real-time.</p>
+          <h3>Scanning 7+ Platforms for {activeFilter !== 'ALL' ? activeFilter : ''} Deals...</h3>
+          <p>The intelligence engine is continuously monitoring Amazon, Flipkart, Myntra, Croma, Reliance Digital, Ajio, Tata CLiQ, Nykaa, and Pepperfry in real-time.</p>
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -152,3 +226,4 @@ export const LiveRadar: React.FC<LiveRadarProps> = ({
     </div>
   );
 };
+
