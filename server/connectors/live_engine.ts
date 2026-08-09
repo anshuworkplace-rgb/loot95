@@ -126,7 +126,10 @@ export async function fetchLiveDealsFromStream(): Promise<DealEvent[]> {
       }
 
       const previousPrice = existingProduct?.currentPrice || mrp;
-      const targetUrl = liveValidation.finalUrl || cand.targetUrl;
+      let targetUrl = liveValidation.finalUrl || cand.targetUrl;
+      if (!targetUrl || targetUrl.includes('B0CHZ4RPDG') || liveValidation.error?.includes('404')) {
+        targetUrl = `https://www.amazon.in/s?k=${encodeURIComponent(title.split(' ').slice(0, 5).join(' '))}`;
+      }
 
       const product: Product = {
         id: productId,

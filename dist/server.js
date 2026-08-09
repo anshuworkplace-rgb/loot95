@@ -1737,6 +1737,16 @@ function parseAmazonHtml(html, base) {
   if (lowerHtml.includes("renewed") || lowerHtml.includes("refurbished") || lowerHtml.includes("pre-owned") || lowerHtml.includes("used - like new")) {
     result.isRefurbishedOrUsed = true;
   }
+  const is404Page = lowerHtml.includes("looking for something?") || lowerHtml.includes("web address you entered is not a functioning page") || lowerHtml.includes("page not found") || lowerHtml.includes("csm/404");
+  if (is404Page) {
+    result.stockStatus = "out_of_stock";
+    result.isAvailable = false;
+    result.error = "Amazon 404 Page Not Found";
+    if (result.title) {
+      result.finalUrl = `https://www.amazon.in/s?k=${encodeURIComponent(result.title)}`;
+    }
+    return result;
+  }
   const isUnavailable = lowerHtml.includes("currently unavailable") || lowerHtml.includes("we don't know when or if this item will be back in stock") || lowerHtml.includes("out of stock.") || lowerHtml.includes("temporarily out of stock");
   if (isUnavailable) {
     result.stockStatus = "out_of_stock";
@@ -1939,7 +1949,10 @@ async function fetchLiveDealsFromStream() {
         }
       }
       const previousPrice = existingProduct?.currentPrice || mrp;
-      const targetUrl = liveValidation.finalUrl || cand.targetUrl;
+      let targetUrl = liveValidation.finalUrl || cand.targetUrl;
+      if (!targetUrl || targetUrl.includes("B0CHZ4RPDG") || liveValidation.error?.includes("404")) {
+        targetUrl = `https://www.amazon.in/s?k=${encodeURIComponent(title.split(" ").slice(0, 5).join(" "))}`;
+      }
       const product = {
         id: productId,
         asin: asin || void 0,

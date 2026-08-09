@@ -243,6 +243,22 @@ function parseAmazonHtml(html: string, base: LiveValidationResult): LiveValidati
     result.isRefurbishedOrUsed = true;
   }
 
+  const is404Page = 
+    lowerHtml.includes('looking for something?') ||
+    lowerHtml.includes('web address you entered is not a functioning page') ||
+    lowerHtml.includes('page not found') ||
+    lowerHtml.includes('csm/404');
+
+  if (is404Page) {
+    result.stockStatus = 'out_of_stock';
+    result.isAvailable = false;
+    result.error = 'Amazon 404 Page Not Found';
+    if (result.title) {
+      result.finalUrl = `https://www.amazon.in/s?k=${encodeURIComponent(result.title)}`;
+    }
+    return result;
+  }
+
   // Stock Availability
   const isUnavailable = 
     lowerHtml.includes('currently unavailable') ||
