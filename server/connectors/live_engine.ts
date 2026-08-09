@@ -12,6 +12,23 @@ import { processPriceEvent } from '../engine/pipeline.js';
 let pollTimer: ReturnType<typeof setInterval> | null = null;
 let totalEventsProcessed = 0;
 
+function decodeHtmlEntities(str: string): string {
+  return str
+    .replace(/&amp;/g, '&')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&nbsp;/g, ' ')
+    .trim();
+}
+
+const JUNK_KEYWORDS = [
+  'garbage bag', 'trash bag', 'dustbin cover', 'floor mat', 'bath mat',
+  'doormat', 'silicone mat', 'skate scooter', 'kids scooter', 'microfiber cloth',
+  'mop refill', 'cleaning cloth', 'soap dish', 'plastic toy', 'cable clip'
+];
+
 export async function fetchLiveDealsFromStream() {
   const startTime = Date.now();
   console.log('[Live Engine] Ingesting real-time e-commerce deal stream...');
@@ -40,18 +57,32 @@ export async function fetchLiveDealsFromStream() {
     const now = new Date().toISOString();
     const processedDeals = [];
 
-    // Process top 30 freshest deals per polling cycle to keep pipeline responsive
-    const slice = itemMatches.slice(0, 30);
+    // Filter out non-deal/junk items and process top 40 freshest deals
+    const validItems = [];
+    for (const itemXml of itemMatches) {
+      const titleMatch = itemXml.match(/<title>(.*?)<\/title>/);
+      if (!titleMatch) continue;
+      const rawTitle = titleMatch[1].replace(/<!\[CDATA\[(.*?)\]\]>/g, '$1').trim();
+      const cleanTitle = decodeHtmlEntities(rawTitle);
 
-    for (const itemXml of slice) {
+      const lowerTitle = cleanTitle.toLowerCase();
+      if (JUNK_KEYWORDS.some(kw => lowerTitle.includes(kw))) {
+        continue; // Skip non-tech junk items
+      }
+
+      validItems.push({ itemXml, cleanTitle });
+      if (validItems.length >= 40) break;
+    }
+
+    for (const { itemXml, cleanTitle } of validItems) {
       const titleMatch = itemXml.match(/<title>(.*?)<\/title>/);
       const descMatch = itemXml.match(/<description>(.*?)<\/description>/);
       const linkMatch = itemXml.match(/<link>(.*?)<\/link>/);
 
-      if (!titleMatch || !descMatch) continue;
+      if (!descMatch) continue;
 
-      const title = titleMatch[1].replace(/<!\[CDATA\[(.*?)\]\]>/g, '$1').trim();
-      const desc = descMatch[1].replace(/<!\[CDATA\[(.*?)\]\]>/g, '$1').trim();
+      const title = cleanTitle;
+      const desc = decodeHtmlEntities(descMatch[1].replace(/<!\[CDATA\[(.*?)\]\]>/g, '$1').trim());
 
       // Extract store
       const storeMatch = desc.match(/Offer Store:\s*([^.]+)/i);

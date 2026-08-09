@@ -57,25 +57,39 @@ class Store {
   // ─── Purge Simulated Data ──────────────────────────────────────
   purgeSimulatedData(): void {
     this.connectors.delete('simulator');
+    const junkKeywords = ['garbage bag', 'trash bag', 'skate scooter', 'floor mat', 'bath mat', 'doormat'];
+
     for (const [id, p] of this.products.entries()) {
       if (id.startsWith('sim_') || id.startsWith('amz_in_sim_')) {
         this.products.delete(id);
         this.priceHistory.delete(id);
         this.priceStats.delete(id);
       } else if (p) {
+        p.title = p.title.replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>').trim();
+        const lower = p.title.toLowerCase();
+        if (junkKeywords.some(kw => lower.includes(kw))) {
+          this.products.delete(id);
+          this.priceHistory.delete(id);
+          this.priceStats.delete(id);
+          continue;
+        }
         if (!p.url || !p.url.startsWith('http') || p.url.includes('B09R673DBP')) {
           p.url = `https://www.amazon.in/s?k=${encodeURIComponent(p.title)}`;
         }
       }
     }
-    this.dealEvents = this.dealEvents.filter(d => !d.productId.startsWith('sim_') && !d.productId.startsWith('amz_in_sim_'));
-    for (const d of this.dealEvents) {
-      if (!d.product?.url || !d.product.url.startsWith('http') || d.product.url.includes('B09R673DBP')) {
-        if (d.product) {
-          d.product.url = `https://www.amazon.in/s?k=${encodeURIComponent(d.product.title)}`;
-        }
+
+    this.dealEvents = this.dealEvents.filter(d => {
+      if (!d.product || d.productId.startsWith('sim_') || d.productId.startsWith('amz_in_sim_')) return false;
+      d.product.title = d.product.title.replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>').trim();
+      const lower = d.product.title.toLowerCase();
+      if (junkKeywords.some(kw => lower.includes(kw))) return false;
+      if (!d.product.url || !d.product.url.startsWith('http') || d.product.url.includes('B09R673DBP')) {
+        d.product.url = `https://www.amazon.in/s?k=${encodeURIComponent(d.product.title)}`;
       }
-    }
+      return true;
+    });
+
     this.metrics.productsMonitored = this.products.size;
   }
 

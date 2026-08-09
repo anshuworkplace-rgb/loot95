@@ -108,11 +108,20 @@ export async function processPriceEvent(product: Product, priceEvent: PriceEvent
   // ─── COMPUTE SCORE COMPONENTS ─────────────────────────────
   const components = computeScoreComponents(
     priceEvent, product, primaryStats, history,
-    anomaly.severity, rarity.score, sleeping, prediction
+    anomaly.severity, rarity.score, sleeping, prediction, realDiscountPct, normalPrice
   );
 
   // ─── COMPOSITE LOOT SCORE ─────────────────────────────────
-  const lootScore = computeLootScore(components, config);
+  let lootScore = computeLootScore(components, config);
+
+  // High discount boost: If deal has 60%+ real discount, boost Loot Score accordingly
+  if (realDiscountPct >= 80) {
+    lootScore = Math.max(lootScore, 85 + (realDiscountPct - 80) * 0.7);
+  } else if (realDiscountPct >= 65) {
+    lootScore = Math.max(lootScore, 70 + (realDiscountPct - 65) * 1.0);
+  } else if (realDiscountPct >= 50) {
+    lootScore = Math.max(lootScore, 55 + (realDiscountPct - 50) * 1.0);
+  }
 
   // ─── CLASSIFY ─────────────────────────────────────────────
   const classification = classify(lootScore, realDiscountPct, anomaly, config);
@@ -120,15 +129,13 @@ export async function processPriceEvent(product: Product, priceEvent: PriceEvent
   // ─── CONFIDENCE ───────────────────────────────────────────
   const confidence = computeConfidence(primaryStats, history.length);
   const confidenceReason = confidence < 0.5
-    ? `Limited historical data (${history.length} data points). Score accuracy will improve over time.`
-    : confidence < 0.8
-      ? `Moderate historical data (${history.length} data points). Good confidence.`
-      : `Strong historical data (${history.length} data points). High confidence.`;
+    ? `Limited historical data (${history.length} data points). Good confidence from MRP discount baseline.`
+    : `Strong historical data (${history.length} data points). High confidence.`;
 
   // ─── BUILD EXPLANATIONS ───────────────────────────────────
   const explanations = generateExplanations(
     priceEvent, product, primaryStats, rarity,
-    anomaly, sleeping, neverSeen, realDiscountPct
+    anomaly, sleeping, neverSeen, realDiscountPct, normalPrice
   );
 
   // ─── CREATE DEAL EVENT ────────────────────────────────────
@@ -206,48 +213,46 @@ function computeScoreComponents(
   anomalySeverity: number,
   rarityScore: number,
   sleeping: ReturnType<typeof detectSleepingProduct>,
-  prediction: ReturnType<typeof predictPreLoot>
+  prediction: ReturnType<typeof predictPreLoot>,
+  realDiscountPct: number,
+  normalPrice: number
 ): LootScoreComponents {
   const price = event.effectivePrice;
-  const normalPrice = stats?.median || product.mrp * 0.85;
+  const discountRatio = realDiscountPct / 100;
 
   return {
-    // Historical deviation: z-score mapped to 0-100
-    historicalDeviation: stats
-      ? Math.min(100, Math.max(0, ((stats.mean - price) / (stats.stddev || 1)) * 20))
-      : Math.min(100, ((product.mrp - price) / product.mrp) * 120),
+    // Historical deviation: z-score or discount-based score
+    historicalDeviation: (stats && stats.sampleCount >= 5 && stats.stddev > 0)
+      ? Math.min(100, Math.max(0, ((stats.mean - price) / stats.stddev) * 20))
+      : Math.min(100, discountRatio * 110),
 
-    // Historical rarity: from rarity calculator
-    historicalRarity: rarityScore,
+    // Historical rarity: from rarity calculator or discount-based
+    historicalRarity: rarityScore > 0 ? rarityScore : Math.min(100, discountRatio * 110),
 
     // Discount vs various baselines
-    discountVsNormal: Math.min(100, Math.max(0, ((normalPrice - price) / normalPrice) * 100)),
-    discountVsMedian: stats
+    discountVsNormal: Math.min(100, Math.max(0, discountRatio * 100)),
+    discountVsMedian: (stats && stats.sampleCount >= 5)
       ? Math.min(100, Math.max(0, ((stats.median - price) / stats.median) * 100))
-      : 0,
-    discountVsMin: stats
+      : Math.min(100, discountRatio * 100),
+    discountVsMin: (stats && stats.sampleCount >= 5)
       ? Math.min(100, Math.max(0, ((stats.min - price) / (stats.min || 1)) * 100 + 50))
-      : 0,
+      : Math.min(100, discountRatio * 90),
 
-    // Cross-platform: future feature, default to 50
+    // Cross-platform: default
     crossPlatformDiff: 50,
 
-    // Price velocity: how fast did price drop?
-    priceVelocity: event.priceChangePct
-      ? Math.min(100, Math.abs(event.priceChangePct) * 1.5)
-      : 0,
+    // Price velocity: based on discount
+    priceVelocity: Math.min(100, realDiscountPct * 1.2),
 
     // Seller reliability: based on seller rating
     sellerReliability: Math.min(100, (product.sellerRating / 5) * 100),
 
-    // Stock
+    // Stock availability: 100 for in_stock
     stockAvailability: product.stockStatus === 'in_stock' ? 100
       : product.stockStatus === 'low_stock' ? 60 : 0,
 
-    // Deal frequency inverse: how rarely does this discount?
-    dealFrequencyInverse: stats
-      ? Math.max(0, 100 - (stats.extremeDiscountCount / Math.max(1, stats.sampleCount)) * 500)
-      : 70,
+    // Deal frequency inverse
+    dealFrequencyInverse: 75,
 
     // Sleeping product
     sleepingProductBonus: sleeping.isSleeping ? sleeping.priceStability : 0,
@@ -258,8 +263,8 @@ function computeScoreComponents(
     // Disappearance probability
     disappearanceProbability: prediction.disappearanceProbability,
 
-    // Confidence adjustment
-    confidenceAdjustment: computeConfidence(stats, history.length),
+    // Confidence adjustment: 0.8 for new live deals
+    confidenceAdjustment: (stats && stats.sampleCount >= 5) ? computeConfidence(stats, history.length) : 0.8,
   };
 }
 
@@ -283,8 +288,8 @@ function computeLootScore(components: LootScoreComponents, config: ScoringConfig
     components.conditionPenalty * w.conditionPenalty +
     components.disappearanceProbability * w.disappearanceProbability;
 
-  // Scale by confidence
-  score *= (0.5 + 0.5 * components.confidenceAdjustment);
+  // Scale by confidence adjustment
+  score *= (0.6 + 0.4 * components.confidenceAdjustment);
 
   return Math.max(0, Math.min(100, score));
 }
@@ -300,22 +305,20 @@ function classify(
   // Price error overrides
   if (anomaly.type === 'price_error' && anomaly.severity > 85) return 'PRICE_ERROR';
 
-  // Score-based classification
-  if (lootScore >= config.thresholds.loot95 && realDiscountPct >= 80) return 'LOOT_95';
-  if (lootScore >= config.thresholds.extreme && realDiscountPct >= 60) return 'EXTREME';
-  if (lootScore >= config.thresholds.hot) return 'HOT';
-  if (lootScore >= config.thresholds.great) return 'GREAT';
+  // Score & Discount based classification
+  if (lootScore >= 80 || realDiscountPct >= 80) return 'LOOT_95';
+  if (lootScore >= 65 || realDiscountPct >= 65) return 'EXTREME';
+  if (lootScore >= 50 || realDiscountPct >= 50) return 'HOT';
+  if (lootScore >= 35 || realDiscountPct >= 35) return 'GREAT';
   return 'NORMAL';
 }
 
 // ─── Confidence ───────────────────────────────────────────────
 
 function computeConfidence(stats: PriceStatistics | null, historyLength: number): number {
-  if (!stats) return 0.2;
-  if (stats.sampleCount < 5) return 0.3;
-  if (stats.sampleCount < 15) return 0.5;
-  if (stats.sampleCount < 30) return 0.7;
-  if (stats.sampleCount < 60) return 0.85;
+  if (!stats || stats.sampleCount < 3) return 0.75;
+  if (stats.sampleCount < 15) return 0.8;
+  if (stats.sampleCount < 30) return 0.88;
   return 0.95;
 }
 
@@ -329,16 +332,17 @@ function generateExplanations(
   anomaly: { severity: number; details: string; type: string },
   sleeping: { isSleeping: boolean; details: string },
   neverSeen: { result: boolean; message: string },
-  realDiscountPct: number
+  realDiscountPct: number,
+  normalPrice: number
 ): string[] {
   const explanations: string[] = [];
 
-  if (stats) {
+  if (stats && stats.sampleCount >= 5 && stats.median > event.effectivePrice) {
     explanations.push(
       `Current price is ${realDiscountPct}% below the ${stats.period} median of ₹${stats.median.toLocaleString('en-IN')}`
     );
   } else {
-    explanations.push(`Current price is ${realDiscountPct}% below normal market price`);
+    explanations.push(`Current price is ${realDiscountPct}% below normal MRP of ₹${normalPrice.toLocaleString('en-IN')}`);
   }
 
   if (neverSeen.result) {

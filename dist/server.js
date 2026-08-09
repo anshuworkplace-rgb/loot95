@@ -50,25 +50,36 @@ var init_store = __esm({
       // ─── Purge Simulated Data ──────────────────────────────────────
       purgeSimulatedData() {
         this.connectors.delete("simulator");
+        const junkKeywords = ["garbage bag", "trash bag", "skate scooter", "floor mat", "bath mat", "doormat"];
         for (const [id, p] of this.products.entries()) {
           if (id.startsWith("sim_") || id.startsWith("amz_in_sim_")) {
             this.products.delete(id);
             this.priceHistory.delete(id);
             this.priceStats.delete(id);
           } else if (p) {
+            p.title = p.title.replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&lt;/g, "<").replace(/&gt;/g, ">").trim();
+            const lower = p.title.toLowerCase();
+            if (junkKeywords.some((kw) => lower.includes(kw))) {
+              this.products.delete(id);
+              this.priceHistory.delete(id);
+              this.priceStats.delete(id);
+              continue;
+            }
             if (!p.url || !p.url.startsWith("http") || p.url.includes("B09R673DBP")) {
               p.url = `https://www.amazon.in/s?k=${encodeURIComponent(p.title)}`;
             }
           }
         }
-        this.dealEvents = this.dealEvents.filter((d) => !d.productId.startsWith("sim_") && !d.productId.startsWith("amz_in_sim_"));
-        for (const d of this.dealEvents) {
-          if (!d.product?.url || !d.product.url.startsWith("http") || d.product.url.includes("B09R673DBP")) {
-            if (d.product) {
-              d.product.url = `https://www.amazon.in/s?k=${encodeURIComponent(d.product.title)}`;
-            }
+        this.dealEvents = this.dealEvents.filter((d) => {
+          if (!d.product || d.productId.startsWith("sim_") || d.productId.startsWith("amz_in_sim_")) return false;
+          d.product.title = d.product.title.replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&lt;/g, "<").replace(/&gt;/g, ">").trim();
+          const lower = d.product.title.toLowerCase();
+          if (junkKeywords.some((kw) => lower.includes(kw))) return false;
+          if (!d.product.url || !d.product.url.startsWith("http") || d.product.url.includes("B09R673DBP")) {
+            d.product.url = `https://www.amazon.in/s?k=${encodeURIComponent(d.product.title)}`;
           }
-        }
+          return true;
+        });
         this.metrics.productsMonitored = this.products.size;
       }
       // ─── Products ───────────────────────────────────────────────
@@ -843,12 +854,21 @@ async function processPriceEvent(product, priceEvent) {
     anomaly.severity,
     rarity.score,
     sleeping,
-    prediction
+    prediction,
+    realDiscountPct,
+    normalPrice
   );
-  const lootScore = computeLootScore(components, config);
+  let lootScore = computeLootScore(components, config);
+  if (realDiscountPct >= 80) {
+    lootScore = Math.max(lootScore, 85 + (realDiscountPct - 80) * 0.7);
+  } else if (realDiscountPct >= 65) {
+    lootScore = Math.max(lootScore, 70 + (realDiscountPct - 65) * 1);
+  } else if (realDiscountPct >= 50) {
+    lootScore = Math.max(lootScore, 55 + (realDiscountPct - 50) * 1);
+  }
   const classification = classify(lootScore, realDiscountPct, anomaly, config);
   const confidence = computeConfidence(primaryStats, history.length);
-  const confidenceReason = confidence < 0.5 ? `Limited historical data (${history.length} data points). Score accuracy will improve over time.` : confidence < 0.8 ? `Moderate historical data (${history.length} data points). Good confidence.` : `Strong historical data (${history.length} data points). High confidence.`;
+  const confidenceReason = confidence < 0.5 ? `Limited historical data (${history.length} data points). Good confidence from MRP discount baseline.` : `Strong historical data (${history.length} data points). High confidence.`;
   const explanations = generateExplanations(
     priceEvent,
     product,
@@ -857,7 +877,8 @@ async function processPriceEvent(product, priceEvent) {
     anomaly,
     sleeping,
     neverSeen,
-    realDiscountPct
+    realDiscountPct,
+    normalPrice
   );
   const processingLatency = Date.now() - startTime;
   const dealEvent = {
@@ -909,68 +930,66 @@ async function processPriceEvent(product, priceEvent) {
   );
   return dealEvent;
 }
-function computeScoreComponents(event, product, stats, history, anomalySeverity, rarityScore, sleeping, prediction) {
+function computeScoreComponents(event, product, stats, history, anomalySeverity, rarityScore, sleeping, prediction, realDiscountPct, normalPrice) {
   const price = event.effectivePrice;
-  const normalPrice = stats?.median || product.mrp * 0.85;
+  const discountRatio = realDiscountPct / 100;
   return {
-    // Historical deviation: z-score mapped to 0-100
-    historicalDeviation: stats ? Math.min(100, Math.max(0, (stats.mean - price) / (stats.stddev || 1) * 20)) : Math.min(100, (product.mrp - price) / product.mrp * 120),
-    // Historical rarity: from rarity calculator
-    historicalRarity: rarityScore,
+    // Historical deviation: z-score or discount-based score
+    historicalDeviation: stats && stats.sampleCount >= 5 && stats.stddev > 0 ? Math.min(100, Math.max(0, (stats.mean - price) / stats.stddev * 20)) : Math.min(100, discountRatio * 110),
+    // Historical rarity: from rarity calculator or discount-based
+    historicalRarity: rarityScore > 0 ? rarityScore : Math.min(100, discountRatio * 110),
     // Discount vs various baselines
-    discountVsNormal: Math.min(100, Math.max(0, (normalPrice - price) / normalPrice * 100)),
-    discountVsMedian: stats ? Math.min(100, Math.max(0, (stats.median - price) / stats.median * 100)) : 0,
-    discountVsMin: stats ? Math.min(100, Math.max(0, (stats.min - price) / (stats.min || 1) * 100 + 50)) : 0,
-    // Cross-platform: future feature, default to 50
+    discountVsNormal: Math.min(100, Math.max(0, discountRatio * 100)),
+    discountVsMedian: stats && stats.sampleCount >= 5 ? Math.min(100, Math.max(0, (stats.median - price) / stats.median * 100)) : Math.min(100, discountRatio * 100),
+    discountVsMin: stats && stats.sampleCount >= 5 ? Math.min(100, Math.max(0, (stats.min - price) / (stats.min || 1) * 100 + 50)) : Math.min(100, discountRatio * 90),
+    // Cross-platform: default
     crossPlatformDiff: 50,
-    // Price velocity: how fast did price drop?
-    priceVelocity: event.priceChangePct ? Math.min(100, Math.abs(event.priceChangePct) * 1.5) : 0,
+    // Price velocity: based on discount
+    priceVelocity: Math.min(100, realDiscountPct * 1.2),
     // Seller reliability: based on seller rating
     sellerReliability: Math.min(100, product.sellerRating / 5 * 100),
-    // Stock
+    // Stock availability: 100 for in_stock
     stockAvailability: product.stockStatus === "in_stock" ? 100 : product.stockStatus === "low_stock" ? 60 : 0,
-    // Deal frequency inverse: how rarely does this discount?
-    dealFrequencyInverse: stats ? Math.max(0, 100 - stats.extremeDiscountCount / Math.max(1, stats.sampleCount) * 500) : 70,
+    // Deal frequency inverse
+    dealFrequencyInverse: 75,
     // Sleeping product
     sleepingProductBonus: sleeping.isSleeping ? sleeping.priceStability : 0,
     // Condition penalty
     conditionPenalty: (product.couponRequired ? 30 : 0) + (product.bankOfferRequired ? 20 : 0),
     // Disappearance probability
     disappearanceProbability: prediction.disappearanceProbability,
-    // Confidence adjustment
-    confidenceAdjustment: computeConfidence(stats, history.length)
+    // Confidence adjustment: 0.8 for new live deals
+    confidenceAdjustment: stats && stats.sampleCount >= 5 ? computeConfidence(stats, history.length) : 0.8
   };
 }
 function computeLootScore(components, config2) {
   const w = config2.weights;
   let score = components.historicalDeviation * w.historicalDeviation + components.historicalRarity * w.historicalRarity + components.discountVsNormal * w.discountVsNormal + components.discountVsMedian * w.discountVsMedian + components.discountVsMin * w.discountVsMin + components.crossPlatformDiff * w.crossPlatformDiff + components.priceVelocity * w.priceVelocity + components.sellerReliability * w.sellerReliability + components.stockAvailability * w.stockAvailability + components.dealFrequencyInverse * w.dealFrequencyInverse + components.sleepingProductBonus * w.sleepingProductBonus + components.conditionPenalty * w.conditionPenalty + components.disappearanceProbability * w.disappearanceProbability;
-  score *= 0.5 + 0.5 * components.confidenceAdjustment;
+  score *= 0.6 + 0.4 * components.confidenceAdjustment;
   return Math.max(0, Math.min(100, score));
 }
 function classify(lootScore, realDiscountPct, anomaly, config2) {
   if (anomaly.type === "price_error" && anomaly.severity > 85) return "PRICE_ERROR";
-  if (lootScore >= config2.thresholds.loot95 && realDiscountPct >= 80) return "LOOT_95";
-  if (lootScore >= config2.thresholds.extreme && realDiscountPct >= 60) return "EXTREME";
-  if (lootScore >= config2.thresholds.hot) return "HOT";
-  if (lootScore >= config2.thresholds.great) return "GREAT";
+  if (lootScore >= 80 || realDiscountPct >= 80) return "LOOT_95";
+  if (lootScore >= 65 || realDiscountPct >= 65) return "EXTREME";
+  if (lootScore >= 50 || realDiscountPct >= 50) return "HOT";
+  if (lootScore >= 35 || realDiscountPct >= 35) return "GREAT";
   return "NORMAL";
 }
 function computeConfidence(stats, historyLength) {
-  if (!stats) return 0.2;
-  if (stats.sampleCount < 5) return 0.3;
-  if (stats.sampleCount < 15) return 0.5;
-  if (stats.sampleCount < 30) return 0.7;
-  if (stats.sampleCount < 60) return 0.85;
+  if (!stats || stats.sampleCount < 3) return 0.75;
+  if (stats.sampleCount < 15) return 0.8;
+  if (stats.sampleCount < 30) return 0.88;
   return 0.95;
 }
-function generateExplanations(event, product, stats, rarity, anomaly, sleeping, neverSeen, realDiscountPct) {
+function generateExplanations(event, product, stats, rarity, anomaly, sleeping, neverSeen, realDiscountPct, normalPrice) {
   const explanations = [];
-  if (stats) {
+  if (stats && stats.sampleCount >= 5 && stats.median > event.effectivePrice) {
     explanations.push(
       `Current price is ${realDiscountPct}% below the ${stats.period} median of \u20B9${stats.median.toLocaleString("en-IN")}`
     );
   } else {
-    explanations.push(`Current price is ${realDiscountPct}% below normal market price`);
+    explanations.push(`Current price is ${realDiscountPct}% below normal MRP of \u20B9${normalPrice.toLocaleString("en-IN")}`);
   }
   if (neverSeen.result) {
     explanations.push(neverSeen.message);
@@ -1399,6 +1418,26 @@ init_pipeline();
 import { v4 as uuid3 } from "uuid";
 var pollTimer2 = null;
 var totalEventsProcessed = 0;
+function decodeHtmlEntities(str) {
+  return str.replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&nbsp;/g, " ").trim();
+}
+var JUNK_KEYWORDS = [
+  "garbage bag",
+  "trash bag",
+  "dustbin cover",
+  "floor mat",
+  "bath mat",
+  "doormat",
+  "silicone mat",
+  "skate scooter",
+  "kids scooter",
+  "microfiber cloth",
+  "mop refill",
+  "cleaning cloth",
+  "soap dish",
+  "plastic toy",
+  "cable clip"
+];
 async function fetchLiveDealsFromStream() {
   const startTime = Date.now();
   console.log("[Live Engine] Ingesting real-time e-commerce deal stream...");
@@ -1421,14 +1460,26 @@ async function fetchLiveDealsFromStream() {
     const latencyMs = Date.now() - startTime;
     const now = (/* @__PURE__ */ new Date()).toISOString();
     const processedDeals = [];
-    const slice = itemMatches.slice(0, 30);
-    for (const itemXml of slice) {
+    const validItems = [];
+    for (const itemXml of itemMatches) {
+      const titleMatch = itemXml.match(/<title>(.*?)<\/title>/);
+      if (!titleMatch) continue;
+      const rawTitle = titleMatch[1].replace(/<!\[CDATA\[(.*?)\]\]>/g, "$1").trim();
+      const cleanTitle = decodeHtmlEntities(rawTitle);
+      const lowerTitle = cleanTitle.toLowerCase();
+      if (JUNK_KEYWORDS.some((kw) => lowerTitle.includes(kw))) {
+        continue;
+      }
+      validItems.push({ itemXml, cleanTitle });
+      if (validItems.length >= 40) break;
+    }
+    for (const { itemXml, cleanTitle } of validItems) {
       const titleMatch = itemXml.match(/<title>(.*?)<\/title>/);
       const descMatch = itemXml.match(/<description>(.*?)<\/description>/);
       const linkMatch = itemXml.match(/<link>(.*?)<\/link>/);
-      if (!titleMatch || !descMatch) continue;
-      const title = titleMatch[1].replace(/<!\[CDATA\[(.*?)\]\]>/g, "$1").trim();
-      const desc = descMatch[1].replace(/<!\[CDATA\[(.*?)\]\]>/g, "$1").trim();
+      if (!descMatch) continue;
+      const title = cleanTitle;
+      const desc = decodeHtmlEntities(descMatch[1].replace(/<!\[CDATA\[(.*?)\]\]>/g, "$1").trim());
       const storeMatch = desc.match(/Offer Store:\s*([^.]+)/i);
       const storeName = storeMatch ? storeMatch[1].trim() : "Amazon";
       const platformStr = storeName.toLowerCase();
