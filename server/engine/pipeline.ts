@@ -67,10 +67,16 @@ export async function processPriceEvent(product: Product, priceEvent: PriceEvent
   const historicalLow = primaryStats?.min || priceEvent.effectivePrice;
 
   // Real discount = discount vs actual normal baseline selling price
-  const realDiscountPct = Math.max(0, Math.round((normalPrice - priceEvent.effectivePrice) / normalPrice * 100));
+  let realDiscountPct = Math.max(0, Math.round((normalPrice - priceEvent.effectivePrice) / normalPrice * 100));
 
-  // Fast reject: less than 30% real discount → not interesting enough
-  if (realDiscountPct < 30 && mrpDiscount < 50) {
+  // If historical median equaled selling price but product has MRP discount, use MRP discount as effective discount
+  if (realDiscountPct === 0 && mrpDiscount > 0) {
+    realDiscountPct = Math.round(mrpDiscount);
+    normalPrice = product.mrp;
+  }
+
+  // Fast reject: Reject if zero total discount
+  if (realDiscountPct <= 0 && mrpDiscount <= 0) {
     store.incrementProcessedEvents();
     return null;
   }
