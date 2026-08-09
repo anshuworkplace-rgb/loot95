@@ -57,6 +57,19 @@ var init_store = __esm({
         this.load();
         this.saveTimer = setInterval(() => this.save(), 3e4);
       }
+      // ─── Purge Simulated Data ──────────────────────────────────────
+      purgeSimulatedData() {
+        this.connectors.delete("simulator");
+        for (const [id] of this.products.entries()) {
+          if (id.startsWith("sim_") || id.startsWith("amz_in_sim_")) {
+            this.products.delete(id);
+            this.priceHistory.delete(id);
+            this.priceStats.delete(id);
+          }
+        }
+        this.dealEvents = this.dealEvents.filter((d) => !d.productId.startsWith("sim_") && !d.productId.startsWith("amz_in_sim_"));
+        this.metrics.productsMonitored = this.products.size;
+      }
       // ─── Products ───────────────────────────────────────────────
       addProduct(product) {
         this.products.set(product.id, product);
@@ -2007,8 +2020,9 @@ app.listen(PORT, () => {
   console.log("");
   const hasRealKeys = !!(process.env.RAPIDAPI_KEY || RAPIDAPI_KEY);
   if (hasRealKeys) {
-    console.log("[Server] 100% REAL DATA MODE ACTIVE \u2014 Disabling all simulated data. Polling live Amazon India API only.");
+    console.log("[Server] 100% REAL DATA MODE ACTIVE \u2014 Disabling simulation & purging synthetic data.");
     stopSimulation();
+    store.purgeSimulatedData();
     startRealAmazonPolling(2e4);
   } else {
     console.log("[Server] SIMULATION MODE ACTIVE \u2014 Set RAPIDAPI_KEY in .env for live Amazon India deals.");

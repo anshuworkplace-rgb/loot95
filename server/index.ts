@@ -282,8 +282,9 @@ app.listen(PORT, () => {
   const hasRealKeys = !!(process.env.RAPIDAPI_KEY || RAPIDAPI_KEY);
 
   if (hasRealKeys) {
-    console.log('[Server] 100% REAL DATA MODE ACTIVE — Disabling all simulated data. Polling live Amazon India API only.');
+    console.log('[Server] 100% REAL DATA MODE ACTIVE — Disabling simulation & purging synthetic data.');
     stopSimulation();
+    store.purgeSimulatedData();
     startRealAmazonPolling(20000);
   } else {
     console.log('[Server] SIMULATION MODE ACTIVE — Set RAPIDAPI_KEY in .env for live Amazon India deals.');

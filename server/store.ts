@@ -53,6 +53,20 @@ class Store {
     this.saveTimer = setInterval(() => this.save(), 30000);
   }
 
+  // ─── Purge Simulated Data ──────────────────────────────────────
+  purgeSimulatedData(): void {
+    this.connectors.delete('simulator');
+    for (const [id] of this.products.entries()) {
+      if (id.startsWith('sim_') || id.startsWith('amz_in_sim_')) {
+        this.products.delete(id);
+        this.priceHistory.delete(id);
+        this.priceStats.delete(id);
+      }
+    }
+    this.dealEvents = this.dealEvents.filter(d => !d.productId.startsWith('sim_') && !d.productId.startsWith('amz_in_sim_'));
+    this.metrics.productsMonitored = this.products.size;
+  }
+
   // ─── Products ───────────────────────────────────────────────
 
   addProduct(product: Product): void {

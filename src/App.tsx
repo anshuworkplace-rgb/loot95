@@ -142,7 +142,7 @@ export function App() {
 
             <div className="header-metric">
               <div className="label">MODE</div>
-              <div className="value" style={{ color: 'var(--accent-orange)' }}>SIMULATION ACTIVE</div>
+              <div className="value" style={{ color: 'var(--loot-green)' }}>100% REAL AMAZON LIVE</div>
             </div>
           </div>
         </header>
@@ -461,9 +461,11 @@ const AdminView: React.FC<{ status: any }> = ({ status }) => {
             {status?.connectors?.map((conn: any) => (
               <tr key={conn.platform} style={{ borderTop: '1px solid var(--border-subtle)' }}>
                 <td style={{ padding: '12px 16px', fontWeight: 600 }}>{conn.platform.toUpperCase()}</td>
-                <td style={{ padding: '12px 16px', color: 'var(--status-online)' }}>● {conn.status}</td>
+                <td style={{ padding: '12px 16px', color: conn.status === 'ONLINE' ? 'var(--status-online)' : 'var(--accent-orange)' }}>● {conn.status}</td>
                 <td style={{ padding: '12px 16px', fontFamily: 'var(--font-mono)' }}>{conn.eventsProcessed || 0}</td>
-                <td style={{ padding: '12px 16px', color: 'var(--accent-orange)' }}>SIMULATION</td>
+                <td style={{ padding: '12px 16px', color: 'var(--loot-green)', fontWeight: 700 }}>
+                  {conn.platform === 'amazon' ? '100% REAL AMAZON API' : 'SIMULATION'}
+                </td>
               </tr>
             ))}
           </tbody>
