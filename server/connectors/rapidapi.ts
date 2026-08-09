@@ -166,22 +166,26 @@ function extractBrand(title: string): string {
 // Scheduled auto-polling loop for real Amazon India deal hunting
 let pollTimer: ReturnType<typeof setInterval> | null = null;
 
-export function startRealAmazonPolling(intervalMs: number = 15000) { // Default 15 seconds
+export function startRealAmazonPolling(intervalMs: number = 45000) { // Safe 45s interval
   if (!RAPIDAPI_KEY) return;
 
   console.log(`[RapidAPI Connector] Starting live Amazon India real deal polling (interval: ${intervalMs / 1000}s)`);
 
   let queryIndex = 0;
   const poll = async () => {
-    const q = ELECTRONICS_QUERIES[queryIndex % ELECTRONICS_QUERIES.length];
-    queryIndex++;
-    await fetchRealAmazonDeals(q);
+    try {
+      const q = ELECTRONICS_QUERIES[queryIndex % ELECTRONICS_QUERIES.length];
+      queryIndex++;
+      await fetchRealAmazonDeals(q);
+    } catch (err: any) {
+      console.error('[RapidAPI Connector] Polling cycle error:', err.message);
+    }
   };
 
-  // Immediate initial warm-up polls across 3 top queries
-  fetchRealAmazonDeals('Sony wireless headphones deals');
-  fetchRealAmazonDeals('Apple iPhone 16 price drop');
-  fetchRealAmazonDeals('Laptops i7 16GB RAM offers');
+  // Safe sequential warm-up with 3s gaps to prevent 429 rate limits
+  setTimeout(() => fetchRealAmazonDeals('Sony wireless headphones deals').catch(() => {}), 1000);
+  setTimeout(() => fetchRealAmazonDeals('Apple iPhone 16 price drop').catch(() => {}), 4000);
+  setTimeout(() => fetchRealAmazonDeals('Laptops i7 16GB RAM offers').catch(() => {}), 7000);
 
   pollTimer = setInterval(poll, intervalMs);
 }

@@ -281,20 +281,19 @@ app.listen(PORT, () => {
 
   const hasRealKeys = !!process.env.RAPIDAPI_KEY;
 
-  // Always initialize simulator for fallback event stream
+  // Always initialize simulator for 100% continuous feed guarantee
   initializeSimulator();
+  startSimulation(3000);
 
   if (hasRealKeys) {
-    console.log('[Server] REAL DATA + CONTINUOUS FEED ACTIVE — Polling real Amazon India deals every 15s + simulator fallback.');
-    startRealAmazonPolling(15000);
-    startSimulation(5000);
+    console.log('[Server] REAL DATA + CONTINUOUS FEED ACTIVE — Polling real Amazon India deals every 45s + simulator feed.');
+    startRealAmazonPolling(45000);
   } else {
     console.log('[Server] SIMULATION MODE ACTIVE — Set RAPIDAPI_KEY in .env for live Amazon India deals.');
-    startSimulation(3000);
   }
 
-  // Broadcast status updates every 10 seconds
-  setInterval(() => broadcastStatus(), 10000);
+  // Broadcast status & heartbeat every 5 seconds to keep SSE clients alive
+  setInterval(() => broadcastStatus(), 5000);
 });
 
 // ─── Graceful Shutdown ────────────────────────────────────────
