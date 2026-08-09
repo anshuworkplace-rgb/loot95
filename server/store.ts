@@ -54,10 +54,15 @@ class Store {
     this.saveTimer = setInterval(() => this.save(), 30000);
   }
 
-  // ─── Purge Simulated Data ──────────────────────────────────────
+  // ─── Purge Simulated & Non-Product Gossip Data ──────────────────────────────
   purgeSimulatedData(): void {
     this.connectors.delete('simulator');
-    const junkKeywords = ['garbage bag', 'trash bag', 'skate scooter', 'floor mat', 'bath mat', 'doormat'];
+    const junkKeywords = [
+      'garbage bag', 'trash bag', 'skate scooter', 'floor mat', 'bath mat', 'doormat',
+      'why ', 'how to', 'is it', 'review', 'guide', 'best ', 'top 10', 'what is',
+      'hosting', 'hostinger', 'bluehost', 'wordpress', 'domain', 'meaning than size',
+      'valentine\'s day', 'survey', 'quiz', 'contest', 'earn', 'free gift card', 'cashback'
+    ];
 
     for (const [id, p] of this.products.entries()) {
       if (id.startsWith('sim_') || id.startsWith('amz_in_sim_')) {

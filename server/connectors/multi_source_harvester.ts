@@ -30,7 +30,11 @@ const JUNK_KEYWORDS = [
   'doormat', 'silicone mat', 'skate scooter', 'kids scooter', 'microfiber cloth',
   'mop refill', 'cleaning cloth', 'soap dish', 'plastic toy', 'cable clip',
   'socks', 'underwear', 'briefs', 'panties', 'sanitary pad', 'back cover',
-  'screen protector', 'tempered glass', 'phone case'
+  'screen protector', 'tempered glass', 'phone case',
+  'why ', 'how to', 'is it', 'review', 'guide', 'best ', 'top 10', 'what is',
+  'hosting', 'hostinger', 'bluehost', 'wordpress', 'domain', 'meaning than size',
+  'valentine\'s day', 'survey', 'quiz', 'contest', 'earn', 'free gift card', 'cashback',
+  'blog', 'article', 'news', 'opinion'
 ];
 
 function decodeHtmlEntities(str: string): string {

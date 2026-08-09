@@ -47,10 +47,38 @@ var init_store = __esm({
         this.load();
         this.saveTimer = setInterval(() => this.save(), 3e4);
       }
-      // ─── Purge Simulated Data ──────────────────────────────────────
+      // ─── Purge Simulated & Non-Product Gossip Data ──────────────────────────────
       purgeSimulatedData() {
         this.connectors.delete("simulator");
-        const junkKeywords = ["garbage bag", "trash bag", "skate scooter", "floor mat", "bath mat", "doormat"];
+        const junkKeywords = [
+          "garbage bag",
+          "trash bag",
+          "skate scooter",
+          "floor mat",
+          "bath mat",
+          "doormat",
+          "why ",
+          "how to",
+          "is it",
+          "review",
+          "guide",
+          "best ",
+          "top 10",
+          "what is",
+          "hosting",
+          "hostinger",
+          "bluehost",
+          "wordpress",
+          "domain",
+          "meaning than size",
+          "valentine's day",
+          "survey",
+          "quiz",
+          "contest",
+          "earn",
+          "free gift card",
+          "cashback"
+        ];
         for (const [id, p] of this.products.entries()) {
           if (id.startsWith("sim_") || id.startsWith("amz_in_sim_")) {
             this.products.delete(id);
@@ -1705,7 +1733,32 @@ var init_multi_source_harvester = __esm({
       "back cover",
       "screen protector",
       "tempered glass",
-      "phone case"
+      "phone case",
+      "why ",
+      "how to",
+      "is it",
+      "review",
+      "guide",
+      "best ",
+      "top 10",
+      "what is",
+      "hosting",
+      "hostinger",
+      "bluehost",
+      "wordpress",
+      "domain",
+      "meaning than size",
+      "valentine's day",
+      "survey",
+      "quiz",
+      "contest",
+      "earn",
+      "free gift card",
+      "cashback",
+      "blog",
+      "article",
+      "news",
+      "opinion"
     ];
   }
 });
