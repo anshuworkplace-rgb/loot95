@@ -279,17 +279,16 @@ app.listen(PORT, () => {
   console.log('═══════════════════════════════════════════════════════════');
   console.log('');
 
-  const hasRealKeys = !!process.env.RAPIDAPI_KEY;
-
-  // Always initialize simulator for 100% continuous feed guarantee
-  initializeSimulator();
-  startSimulation(3000);
+  const hasRealKeys = !!(process.env.RAPIDAPI_KEY || RAPIDAPI_KEY);
 
   if (hasRealKeys) {
-    console.log('[Server] REAL DATA + CONTINUOUS FEED ACTIVE — Polling real Amazon India deals every 45s + simulator feed.');
-    startRealAmazonPolling(45000);
+    console.log('[Server] 100% REAL DATA MODE ACTIVE — Disabling all simulated data. Polling live Amazon India API only.');
+    stopSimulation();
+    startRealAmazonPolling(20000);
   } else {
     console.log('[Server] SIMULATION MODE ACTIVE — Set RAPIDAPI_KEY in .env for live Amazon India deals.');
+    initializeSimulator();
+    startSimulation(3000);
   }
 
   // Broadcast status & heartbeat every 5 seconds to keep SSE clients alive

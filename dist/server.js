@@ -1616,7 +1616,7 @@ function stopSimulation() {
 init_store();
 init_pipeline();
 import { v4 as uuid3 } from "uuid";
-var RAPIDAPI_KEY = process.env.RAPIDAPI_KEY || "";
+var RAPIDAPI_KEY2 = process.env.RAPIDAPI_KEY || "";
 var RAPIDAPI_HOST = process.env.RAPIDAPI_HOST || "real-time-amazon-data.p.rapidapi.com";
 var ELECTRONICS_QUERIES = [
   "Sony wireless headphones deals",
@@ -1641,7 +1641,7 @@ var ELECTRONICS_QUERIES = [
   "Apple Watch Series 10"
 ];
 async function fetchRealAmazonDeals(query = "electronics deals") {
-  const currentKey = process.env.RAPIDAPI_KEY || RAPIDAPI_KEY;
+  const currentKey = process.env.RAPIDAPI_KEY || RAPIDAPI_KEY2;
   if (!currentKey) {
     store.setConnectorStatus({
       platform: "amazon",
@@ -1757,9 +1757,10 @@ function extractBrand(title) {
   return words[0] || "Generic";
 }
 var pollTimer = null;
-function startRealAmazonPolling(intervalMs = 45e3) {
-  if (!RAPIDAPI_KEY) return;
-  console.log(`[RapidAPI Connector] Starting live Amazon India real deal polling (interval: ${intervalMs / 1e3}s)`);
+function startRealAmazonPolling(intervalMs = 2e4) {
+  const currentKey = process.env.RAPIDAPI_KEY || RAPIDAPI_KEY2;
+  if (!currentKey) return;
+  console.log(`[RapidAPI Connector] Starting 100% REAL Amazon India deal polling (interval: ${intervalMs / 1e3}s)`);
   let queryIndex = 0;
   const poll = async () => {
     try {
@@ -1771,11 +1772,15 @@ function startRealAmazonPolling(intervalMs = 45e3) {
     }
   };
   setTimeout(() => fetchRealAmazonDeals("Sony wireless headphones deals").catch(() => {
-  }), 1e3);
+  }), 500);
   setTimeout(() => fetchRealAmazonDeals("Apple iPhone 16 price drop").catch(() => {
-  }), 4e3);
+  }), 3e3);
   setTimeout(() => fetchRealAmazonDeals("Laptops i7 16GB RAM offers").catch(() => {
-  }), 7e3);
+  }), 5500);
+  setTimeout(() => fetchRealAmazonDeals("Samsung OLED TV 55 inch").catch(() => {
+  }), 8e3);
+  setTimeout(() => fetchRealAmazonDeals("boAt Airdopes discount").catch(() => {
+  }), 10500);
   pollTimer = setInterval(poll, intervalMs);
 }
 function stopRealAmazonPolling() {
@@ -2005,14 +2010,15 @@ app.listen(PORT, () => {
   console.log("  Mode:          SIMULATION (realistic electronics data)");
   console.log("\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550");
   console.log("");
-  const hasRealKeys = !!process.env.RAPIDAPI_KEY;
-  initializeSimulator();
-  startSimulation(3e3);
+  const hasRealKeys = !!(process.env.RAPIDAPI_KEY || RAPIDAPI_KEY);
   if (hasRealKeys) {
-    console.log("[Server] REAL DATA + CONTINUOUS FEED ACTIVE \u2014 Polling real Amazon India deals every 45s + simulator feed.");
-    startRealAmazonPolling(45e3);
+    console.log("[Server] 100% REAL DATA MODE ACTIVE \u2014 Disabling all simulated data. Polling live Amazon India API only.");
+    stopSimulation();
+    startRealAmazonPolling(2e4);
   } else {
     console.log("[Server] SIMULATION MODE ACTIVE \u2014 Set RAPIDAPI_KEY in .env for live Amazon India deals.");
+    initializeSimulator();
+    startSimulation(3e3);
   }
   setInterval(() => broadcastStatus(), 5e3);
 });
