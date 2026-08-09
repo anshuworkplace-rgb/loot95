@@ -281,13 +281,15 @@ app.listen(PORT, () => {
 
   const hasRealKeys = !!process.env.RAPIDAPI_KEY;
 
+  // Always initialize simulator for fallback event stream
+  initializeSimulator();
+
   if (hasRealKeys) {
-    console.log('[Server] REAL DATA MODE ACTIVE — Disabling dummy simulator, polling real Amazon India deals.');
-    // Poll real Amazon India deals immediately & every 60 seconds
-    startRealAmazonPolling(60000);
+    console.log('[Server] REAL DATA + CONTINUOUS FEED ACTIVE — Polling real Amazon India deals every 15s + simulator fallback.');
+    startRealAmazonPolling(15000);
+    startSimulation(5000);
   } else {
     console.log('[Server] SIMULATION MODE ACTIVE — Set RAPIDAPI_KEY in .env for live Amazon India deals.');
-    initializeSimulator();
     startSimulation(3000);
   }
 

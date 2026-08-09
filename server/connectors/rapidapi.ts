@@ -21,6 +21,19 @@ const ELECTRONICS_QUERIES = [
   'Smart TV 55 inch 4K discount',
   'Apple AirPods Pro 2',
   'Dyson vacuum cleaner deal',
+  'OnePlus 12R 5G deal',
+  'MacBook Air M3 offer',
+  'Gaming Laptop RTX 4060',
+  'Samsung OLED TV 55 inch',
+  'PS5 console disc edition',
+  'JBL Bluetooth speaker discount',
+  'Asus ROG gaming laptop',
+  'iPad 10th Gen offer',
+  'Pixel 9 Pro price drop',
+  'boAt Airdopes discount',
+  'Realme GT 6 5G deal',
+  'Canon EOS R50 camera',
+  'Apple Watch Series 10',
 ];
 
 export async function fetchRealAmazonDeals(query: string = 'electronics deals') {
@@ -153,7 +166,7 @@ function extractBrand(title: string): string {
 // Scheduled auto-polling loop for real Amazon India deal hunting
 let pollTimer: ReturnType<typeof setInterval> | null = null;
 
-export function startRealAmazonPolling(intervalMs: number = 600000) { // Default 10 mins
+export function startRealAmazonPolling(intervalMs: number = 15000) { // Default 15 seconds
   if (!RAPIDAPI_KEY) return;
 
   console.log(`[RapidAPI Connector] Starting live Amazon India real deal polling (interval: ${intervalMs / 1000}s)`);
@@ -165,7 +178,11 @@ export function startRealAmazonPolling(intervalMs: number = 600000) { // Default
     await fetchRealAmazonDeals(q);
   };
 
-  poll(); // Initial run
+  // Immediate initial warm-up polls across 3 top queries
+  fetchRealAmazonDeals('Sony wireless headphones deals');
+  fetchRealAmazonDeals('Apple iPhone 16 price drop');
+  fetchRealAmazonDeals('Laptops i7 16GB RAM offers');
+
   pollTimer = setInterval(poll, intervalMs);
 }
 
