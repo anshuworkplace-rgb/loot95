@@ -1,0 +1,19 @@
+# ═══════════════════════════════════════════════════════════════
+# LOOT 95 — Render Infrastructure-as-Code Deployment Blueprint
+# Web Service hosting 24/7 Node.js multi-source deal engine
+# ═══════════════════════════════════════════════════════════════
+
+services:
+  - type: web
+    name: loot95-engine
+    env: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    region: singapore
+    healthCheckPath: /api/metrics
+    envVars:
+      - key: PORT
+        value: 3001
+      - key: NODE_ENV
+        value: production
+    autoDeploy: true

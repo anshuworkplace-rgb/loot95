@@ -13,8 +13,9 @@ import { store } from '../store.js';
 import {
   computePriceStatistics, calculateRarityScore,
   detectAnomaly, detectSleepingProduct,
-  predictPreLoot, isNeverSeenBefore,
+  predictPreLoot, isNeverSeenBefore, computeDealAnomalyMetrics,
 } from './intelligence.js';
+import { fetchAggregatedPriceBaseline } from '../connectors/price_tracker_aggregator.js';
 import { judgeDeal } from '../ai/deal-judge.js';
 import { sendLoot95EmailAlert } from '../notifications/email.js';
 
@@ -138,6 +139,29 @@ export async function processPriceEvent(product: Product, priceEvent: PriceEvent
     anomaly, sleeping, neverSeen, realDiscountPct, normalPrice
   );
 
+  // ─── COMPUTE DEAL ANOMALY METRICS ───────────────────────
+  const aggregatorBaseline = await fetchAggregatedPriceBaseline(
+    product.id,
+    product.platform,
+    product.asin,
+    product.fsid,
+    priceEvent.effectivePrice,
+    product.mrp
+  );
+
+  const anomalyMetrics = computeDealAnomalyMetrics(
+    product,
+    priceEvent.effectivePrice,
+    product.mrp,
+    primaryStats,
+    aggregatorBaseline
+  );
+
+  // Boost Loot Score using compositeDealScore if composite score is higher
+  if (anomalyMetrics.compositeDealScore > lootScore) {
+    lootScore = anomalyMetrics.compositeDealScore;
+  }
+
   // ─── CREATE DEAL EVENT ────────────────────────────────────
   const processingLatency = Date.now() - startTime;
 
@@ -149,6 +173,7 @@ export async function processPriceEvent(product: Product, priceEvent: PriceEvent
     lootScore: Math.round(lootScore * 10) / 10,
     rarityScore: rarity.score,
     scoreComponents: components,
+    anomalyMetrics,
     confidence: Math.round(confidence * 100) / 100,
     confidenceReason,
     currentPrice: priceEvent.effectivePrice,
@@ -386,7 +411,7 @@ function generateExplanations(
 
 // ─── SSE Broadcasting ─────────────────────────────────────────
 
-function broadcastDeal(deal: DealEvent): void {
+export function broadcastDeal(deal: DealEvent): void {
   const data = JSON.stringify({ type: 'deal', data: deal });
   for (const client of sseClients) {
     try {

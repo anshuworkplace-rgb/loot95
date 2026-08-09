@@ -202,6 +202,50 @@ app.get('/api/metrics', (_req, res) => {
   });
 });
 
+// Live Hydro-Verification on raw URL
+app.post('/api/deals/verify-url', async (req, res) => {
+  try {
+    const { url, platform } = req.body;
+    if (!url) {
+      res.status(400).json({ success: false, error: 'URL parameter is required' });
+      return;
+    }
+    const { verifyLiveProduct } = await import('./connectors/live_validator.js');
+    const result = await verifyLiveProduct(url, platform);
+    res.json({
+      success: true,
+      data: result,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (e: any) {
+    res.status(500).json({
+      success: false,
+      error: e.message || 'Live URL verification failed',
+      timestamp: new Date().toISOString(),
+    });
+  }
+});
+
+// Trigger Active Deal Re-verification Sweep
+app.post('/api/engine/sweep', async (_req, res) => {
+  try {
+    const { sweepActiveDeals } = await import('./connectors/live_engine.js');
+    const expiredCount = await sweepActiveDeals();
+    res.json({
+      success: true,
+      message: `Active deal sweep completed. Expired/sold-out deals removed: ${expiredCount}`,
+      expiredCount,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (e: any) {
+    res.status(500).json({
+      success: false,
+      error: e.message || 'Active deal sweep failed',
+      timestamp: new Date().toISOString(),
+    });
+  }
+});
+
 // Email Alert Settings
 app.post('/api/settings/email', async (req, res) => {
   const { email } = req.body;

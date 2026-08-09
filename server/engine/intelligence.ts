@@ -4,7 +4,8 @@
 // price statistics, pre-loot prediction
 // ═══════════════════════════════════════════════════════════════
 
-import { PriceHistoryPoint, PriceStatistics } from '../../shared/types.js';
+import { PriceHistoryPoint, PriceStatistics, Product, DealAnomalyMetrics } from '../../shared/types.js';
+import type { AggregatedPriceBaseline } from '../connectors/price_tracker_aggregator.js';
 
 // ─── Statistical Helpers ──────────────────────────────────────
 
@@ -377,4 +378,82 @@ export function isNeverSeenBefore(
   }
 
   return { result: false, message: '' };
+}
+
+// ─── Deal Anomaly Metrics Calculator ──────────────────────────
+
+export function computeDealAnomalyMetrics(
+  product: Product,
+  currentPrice: number,
+  mrp: number,
+  stats: PriceStatistics | null,
+  aggregatorBaseline: AggregatedPriceBaseline | null
+): DealAnomalyMetrics {
+  const normalPrice = aggregatorBaseline?.averageSellingPrice || stats?.median || mrp;
+  const typicalLowestPrice = aggregatorBaseline?.typicalLowestPrice || aggregatorBaseline?.allTimeLow || stats?.min || Math.round(normalPrice * 0.80);
+
+  // Calculate Historical Percentile
+  let historicalPercentile = 50.0;
+  const points = aggregatorBaseline?.pricePoints || [];
+
+  if (points.length > 0) {
+    const countBelow = points.filter(p => p <= currentPrice).length;
+    historicalPercentile = Math.max(0.1, Math.min(99.9, Math.round((countBelow / points.length) * 100 * 10) / 10));
+  } else {
+    const dropBelowLowRatio = (typicalLowestPrice - currentPrice) / (typicalLowestPrice || 1);
+    if (dropBelowLowRatio > 0.3) historicalPercentile = 0.8;
+    else if (dropBelowLowRatio > 0.15) historicalPercentile = 1.2;
+    else if (dropBelowLowRatio > 0) historicalPercentile = 4.5;
+    else historicalPercentile = Math.round((currentPrice / normalPrice) * 100 * 10) / 10;
+  }
+
+  // Rarity Label
+  let rarityLabel: 'VERY HIGH' | 'HIGH' | 'MODERATE' | 'LOW' = 'LOW';
+  if (historicalPercentile <= 3.0) rarityLabel = 'VERY HIGH';
+  else if (historicalPercentile <= 10.0) rarityLabel = 'HIGH';
+  else if (historicalPercentile <= 25.0) rarityLabel = 'MODERATE';
+
+  // Price Anomaly Score (0-100)
+  let priceAnomalyScore = 50;
+  const dropVsTypical = (typicalLowestPrice - currentPrice) / (typicalLowestPrice || 1);
+  const dropVsNormal = (normalPrice - currentPrice) / (normalPrice || 1);
+
+  if (currentPrice < typicalLowestPrice) {
+    priceAnomalyScore = Math.min(99, Math.round(80 + dropVsTypical * 40));
+  } else {
+    priceAnomalyScore = Math.max(10, Math.round(dropVsNormal * 100));
+  }
+
+  // Demand Label
+  let demandLabel: 'EXTREME' | 'HIGH' | 'MODERATE' | 'NORMAL' = 'NORMAL';
+  if (dropVsNormal >= 0.5 || dropVsTypical >= 0.25) demandLabel = 'EXTREME';
+  else if (dropVsNormal >= 0.35 || dropVsTypical >= 0.1) demandLabel = 'HIGH';
+  else if (dropVsNormal >= 0.20) demandLabel = 'MODERATE';
+
+  // Seller Confidence Label
+  let sellerConfidenceLabel: 'VERY HIGH' | 'HIGH' | 'MODERATE' | 'LOW' = 'HIGH';
+  if (product.verifiedLive && product.sellerRating >= 4.5) sellerConfidenceLabel = 'VERY HIGH';
+  else if (product.sellerRating >= 4.0) sellerConfidenceLabel = 'HIGH';
+  else if (product.sellerRating >= 3.5) sellerConfidenceLabel = 'MODERATE';
+  else sellerConfidenceLabel = 'LOW';
+
+  // Composite Deal Score (0-100, e.g. 97.8)
+  const scoreComponent1 = priceAnomalyScore * 0.45;
+  const scoreComponent2 = (100 - historicalPercentile) * 0.35;
+  const scoreComponent3 = Math.min(100, Math.max(0, dropVsNormal * 100)) * 0.20;
+
+  const rawComposite = scoreComponent1 + scoreComponent2 + scoreComponent3;
+  const compositeDealScore = Math.round(Math.min(99.9, Math.max(10.0, rawComposite)) * 10) / 10;
+
+  return {
+    normalPrice,
+    typicalLowestPrice,
+    currentPrice,
+    historicalPercentile,
+    rarityLabel,
+    priceAnomalyScore,
+    demandLabel,
+    sellerConfidenceLabel,
+    compositeDealScore,
+  };
 }

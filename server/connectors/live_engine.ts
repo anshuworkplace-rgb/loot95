@@ -1,211 +1,20 @@
 // ═══════════════════════════════════════════════════════════════
-// LOOT 95 — Zero-Cost Perpetual Live Deal Ingestion Engine
-// Fetches 100% REAL e-commerce deals (Amazon, Flipkart, etc.) from
-// open public deal streams. Operates 24/7/365 with ZERO API costs.
+// LOOT 95 — Autonomous Multi-Source & Live Store Verification Engine
+// Ingests from multi-stream harvesters (DesiDime, FreeKaaMaal, Amazon, DealsMagnet).
+// Performs live store Hydro-Validation against Amazon & Flipkart to eliminate
+// fake prices and out-of-stock products. Sweeps active deals every 5 mins.
 // ═══════════════════════════════════════════════════════════════
 
 import { v4 as uuid } from 'uuid';
-import { Product, PriceEvent, Platform } from '../../shared/types.js';
+import { Product, PriceEvent, Platform, DealEvent } from '../../shared/types.js';
 import { store } from '../store.js';
-import { processPriceEvent } from '../engine/pipeline.js';
+import { processPriceEvent, broadcastDeal } from '../engine/pipeline.js';
+import { harvestAllCandidateDeals, CandidateDeal } from './multi_source_harvester.js';
+import { verifyLiveProduct, extractAmazonAsin, extractFlipkartFsid } from './live_validator.js';
 
 let pollTimer: ReturnType<typeof setInterval> | null = null;
+let sweeperTimer: ReturnType<typeof setInterval> | null = null;
 let totalEventsProcessed = 0;
-
-function decodeHtmlEntities(str: string): string {
-  return str
-    .replace(/&amp;/g, '&')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&nbsp;/g, ' ')
-    .trim();
-}
-
-const JUNK_KEYWORDS = [
-  'garbage bag', 'trash bag', 'dustbin cover', 'floor mat', 'bath mat',
-  'doormat', 'silicone mat', 'skate scooter', 'kids scooter', 'microfiber cloth',
-  'mop refill', 'cleaning cloth', 'soap dish', 'plastic toy', 'cable clip'
-];
-
-export async function fetchLiveDealsFromStream() {
-  const startTime = Date.now();
-  console.log('[Live Engine] Ingesting real-time e-commerce deal stream...');
-
-  try {
-    const res = await fetch('https://dealsmagnet.com/feed', {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-        'Accept': 'application/rss+xml, application/xml, text/xml, */*',
-      }
-    });
-
-    if (!res.ok) {
-      throw new Error(`Feed HTTP ${res.status}: ${res.statusText}`);
-    }
-
-    const xml = await res.text();
-    const itemMatches = xml.match(/<item>[\s\S]*?<\/item>/g) || [];
-
-    if (itemMatches.length === 0) {
-      console.log('[Live Engine] No deal items found in stream');
-      return [];
-    }
-
-    const latencyMs = Date.now() - startTime;
-    const now = new Date().toISOString();
-    const processedDeals = [];
-
-    // Filter out non-deal/junk items and process top 40 freshest deals
-    const validItems = [];
-    for (const itemXml of itemMatches) {
-      const titleMatch = itemXml.match(/<title>(.*?)<\/title>/);
-      if (!titleMatch) continue;
-      const rawTitle = titleMatch[1].replace(/<!\[CDATA\[(.*?)\]\]>/g, '$1').trim();
-      const cleanTitle = decodeHtmlEntities(rawTitle);
-
-      const lowerTitle = cleanTitle.toLowerCase();
-      if (JUNK_KEYWORDS.some(kw => lowerTitle.includes(kw))) {
-        continue; // Skip non-tech junk items
-      }
-
-      validItems.push({ itemXml, cleanTitle });
-      if (validItems.length >= 40) break;
-    }
-
-    for (const { itemXml, cleanTitle } of validItems) {
-      const titleMatch = itemXml.match(/<title>(.*?)<\/title>/);
-      const descMatch = itemXml.match(/<description>(.*?)<\/description>/);
-      const linkMatch = itemXml.match(/<link>(.*?)<\/link>/);
-
-      if (!descMatch) continue;
-
-      const title = cleanTitle;
-      const desc = decodeHtmlEntities(descMatch[1].replace(/<!\[CDATA\[(.*?)\]\]>/g, '$1').trim());
-
-      // Extract store
-      const storeMatch = desc.match(/Offer Store:\s*([^.]+)/i);
-      const storeName = storeMatch ? storeMatch[1].trim() : 'Amazon';
-      const platformStr = storeName.toLowerCase();
-      const platform: Platform = platformStr.includes('flipkart') ? 'flipkart' : 'amazon';
-
-      // Extract Price (offer price)
-      const priceMatch = desc.match(/offer price of ₹\s*([0-9,]+)/i) || desc.match(/₹\s*([0-9,]+)/);
-      if (!priceMatch) continue;
-      const currentPrice = parseInt(priceMatch[1].replace(/,/g, ''), 10);
-      if (isNaN(currentPrice) || currentPrice <= 0) continue;
-
-      // Extract MRP
-      const mrpMatch = desc.match(/MRP:\s*₹\s*([0-9,]+)/i);
-      let mrp = mrpMatch ? parseInt(mrpMatch[1].replace(/,/g, ''), 10) : 0;
-      if (!mrp || mrp < currentPrice) {
-        mrp = Math.round(currentPrice * 1.35);
-      }
-
-      // Generate stable product ID based on title hash
-      const cleanTitleStr = title.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 30);
-      const productId = `live_${platform}_${cleanTitleStr}`;
-      const brand = extractBrand(title);
-      const rawLink = linkMatch ? linkMatch[1] : '';
-      const targetUrl = (rawLink && rawLink.startsWith('http'))
-        ? rawLink
-        : `https://www.amazon.in/s?k=${encodeURIComponent(title)}`;
-
-      const existingProduct = store.getProduct(productId);
-      const previousPrice = existingProduct?.currentPrice || mrp;
-
-      const product: Product = {
-        id: productId,
-        brand,
-        model: title.split(' ').slice(1, 4).join(' ') || 'Product',
-        title,
-        category: categorizeProduct(title, brand),
-        subcategory: subcategorizeProduct(title, brand),
-        platform,
-        platformProductId: productId,
-        url: targetUrl,
-        imageUrl: '',
-        mrp,
-        currentPrice,
-        effectivePrice: currentPrice,
-        sellerName: `${storeName} Verified Seller`,
-        sellerRating: 4.6,
-        stockStatus: 'in_stock',
-        rating: 4.4,
-        reviewCount: 320,
-        couponRequired: false,
-        bankOfferRequired: false,
-        specifications: {},
-        lastCheckedAt: now,
-        createdAt: existingProduct?.createdAt || now,
-        updatedAt: now,
-      };
-
-      store.addProduct(product);
-
-      store.addPricePoint(productId, {
-        timestamp: now,
-        price: currentPrice,
-        effectivePrice: currentPrice,
-      });
-
-      const priceEvent: PriceEvent = {
-        id: uuid(),
-        productId,
-        price: currentPrice,
-        mrp,
-        effectivePrice: currentPrice,
-        previousPrice,
-        priceChange: currentPrice - previousPrice,
-        priceChangePct: previousPrice ? ((currentPrice - previousPrice) / previousPrice) * 100 : 0,
-        sourceTimestamp: now,
-        ingestedAt: now,
-        platform,
-      };
-
-      const deal = await processPriceEvent(product, priceEvent);
-      if (deal) {
-        processedDeals.push(deal);
-      }
-    }
-
-    totalEventsProcessed += validItems.length;
-
-    // Report status to Store
-    store.setConnectorStatus({
-      platform: 'amazon',
-      status: 'ONLINE',
-      lastSuccessAt: now,
-      lastErrorAt: null,
-      errorMessage: null,
-      eventsProcessed: totalEventsProcessed,
-      avgLatencyMs: latencyMs,
-    });
-
-    console.log(`[Live Engine] Successfully processed ${processedDeals.length} live deals from stream (${latencyMs}ms)`);
-    return processedDeals;
-  } catch (err: any) {
-    console.error('[Live Engine] Stream ingestion error:', err.message);
-    store.addError('LiveEngine', err.message);
-
-    // Only update status if status wasn't set by another working connector
-    const currentStatus = store.getConnectorStatuses().find(c => c.platform === 'amazon');
-    if (!currentStatus || currentStatus.status !== 'ONLINE') {
-      store.setConnectorStatus({
-        platform: 'amazon',
-        status: 'DEGRADED',
-        lastSuccessAt: null,
-        lastErrorAt: new Date().toISOString(),
-        errorMessage: err.message,
-        eventsProcessed: totalEventsProcessed,
-        avgLatencyMs: 0,
-      });
-    }
-
-    return [];
-  }
-}
 
 function extractBrand(title: string): string {
   const words = title.split(' ');
@@ -241,8 +50,212 @@ function subcategorizeProduct(title: string, _brand: string): string {
   return 'Deals';
 }
 
-export function startLiveEnginePolling(intervalMs: number = 15000) {
-  console.log(`[Live Engine] Starting 24/7/365 zero-cost deal ingestion engine (interval: ${intervalMs / 1000}s)`);
+/**
+ * Primary Ingestion Workflow:
+ * 1. Ingest candidate deals from all parallel streams.
+ * 2. Run Live Store Hydro-Validation on candidates to verify price & stock.
+ * 3. Filter out unavailable / dead / fake deals.
+ * 4. Process genuine deals through Loot 95 scoring pipeline.
+ */
+export async function fetchLiveDealsFromStream(): Promise<DealEvent[]> {
+  const startTime = Date.now();
+  console.log('[Live Engine] Harvesting candidates from multi-stream network...');
+
+  try {
+    const candidates = await harvestAllCandidateDeals();
+    if (candidates.length === 0) {
+      console.log('[Live Engine] No candidate items harvested');
+      return [];
+    }
+
+    const now = new Date().toISOString();
+    const processedDeals: DealEvent[] = [];
+
+    // Limit live validation batch to top 25 candidates per cycle for optimal performance
+    const candidatesToValidate = candidates.slice(0, 25);
+
+    for (const cand of candidatesToValidate) {
+      // Step 1: Live Hydro-Validation against Amazon / Flipkart direct store page
+      const liveValidation = await verifyLiveProduct(cand.targetUrl, cand.platform);
+
+      // STEP 2: Strict Out-of-Stock Filter (Fixes "90% products are unavailable")
+      if (liveValidation.verifiedLive && !liveValidation.isAvailable) {
+        console.log(`[Live Engine] ❌ REJECTED dead/out-of-stock deal: "${cand.cleanTitle}"`);
+        continue;
+      }
+
+      // Determine genuine current price and MRP (Prefer live store price over RSS claimed)
+      const currentPrice = liveValidation.currentPrice || cand.claimedPrice;
+      if (!currentPrice || currentPrice <= 0) {
+        console.log(`[Live Engine] ⚠️ Skipped deal with invalid price: "${cand.cleanTitle}"`);
+        continue;
+      }
+
+      let mrp = liveValidation.mrp || cand.claimedMrp || 0;
+      if (!mrp || mrp < currentPrice) {
+        mrp = Math.round(currentPrice * 1.35);
+      }
+
+      // Step 3: Canonical Product ID Generation (ASIN, FSID, or Title Hash)
+      const asin = liveValidation.asin || cand.asin || extractAmazonAsin(cand.dealUrl);
+      const fsid = liveValidation.fsid || cand.fsid || extractFlipkartFsid(cand.dealUrl);
+      const title = liveValidation.title || cand.cleanTitle;
+
+      let productId = `live_${cand.platform}_`;
+      if (asin) {
+        productId += `asin_${asin}`;
+      } else if (fsid) {
+        productId += `fsid_${fsid}`;
+      } else {
+        const cleanTitleStr = title.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 30);
+        productId += cleanTitleStr;
+      }
+
+      const brand = extractBrand(title);
+      const existingProduct = store.getProduct(productId);
+
+      // Step 4: Product Cooldown Check (Fixes "showing same product everytime")
+      if (existingProduct) {
+        const lastCheckedTime = new Date(existingProduct.lastCheckedAt).getTime();
+        const minsSinceLastCheck = (Date.now() - lastCheckedTime) / (1000 * 60);
+        
+        // If checked less than 10 mins ago and price hasn't dropped further, skip re-broadcasting identical deal
+        if (minsSinceLastCheck < 10 && existingProduct.currentPrice <= currentPrice) {
+          continue;
+        }
+      }
+
+      const previousPrice = existingProduct?.currentPrice || mrp;
+      const targetUrl = liveValidation.finalUrl || cand.targetUrl;
+
+      const product: Product = {
+        id: productId,
+        asin: asin || undefined,
+        fsid: fsid || undefined,
+        brand,
+        model: title.split(' ').slice(1, 4).join(' ') || 'Product',
+        title,
+        category: categorizeProduct(title, brand),
+        subcategory: subcategorizeProduct(title, brand),
+        platform: cand.platform,
+        platformProductId: asin || fsid || productId,
+        url: targetUrl,
+        imageUrl: liveValidation.imageUrl || cand.imageUrl || '',
+        mrp,
+        currentPrice,
+        effectivePrice: currentPrice,
+        sellerName: `${cand.storeName} Verified Seller`,
+        sellerRating: 4.6,
+        stockStatus: liveValidation.stockStatus,
+        verifiedLive: liveValidation.verifiedLive,
+        sourceName: cand.sourceName,
+        rating: 4.4,
+        reviewCount: 320,
+        couponRequired: false,
+        bankOfferRequired: false,
+        specifications: {},
+        lastCheckedAt: now,
+        createdAt: existingProduct?.createdAt || now,
+        updatedAt: now,
+      };
+
+      store.addProduct(product);
+
+      store.addPricePoint(productId, {
+        timestamp: now,
+        price: currentPrice,
+        effectivePrice: currentPrice,
+      });
+
+      const priceEvent: PriceEvent = {
+        id: uuid(),
+        productId,
+        price: currentPrice,
+        mrp,
+        effectivePrice: currentPrice,
+        previousPrice,
+        priceChange: currentPrice - previousPrice,
+        priceChangePct: previousPrice ? ((currentPrice - previousPrice) / previousPrice) * 100 : 0,
+        sourceTimestamp: now,
+        ingestedAt: now,
+        platform: cand.platform,
+      };
+
+      const deal = await processPriceEvent(product, priceEvent);
+      if (deal) {
+        processedDeals.push(deal);
+      }
+    }
+
+    totalEventsProcessed += candidatesToValidate.length;
+    const latencyMs = Date.now() - startTime;
+
+    store.setConnectorStatus({
+      platform: 'amazon',
+      status: 'ONLINE',
+      lastSuccessAt: now,
+      lastErrorAt: null,
+      errorMessage: null,
+      eventsProcessed: totalEventsProcessed,
+      avgLatencyMs: latencyMs,
+    });
+
+    console.log(`[Live Engine] Successfully ingested & verified ${processedDeals.length} live deals from ${candidatesToValidate.length} candidates (${latencyMs}ms)`);
+    return processedDeals;
+  } catch (err: any) {
+    console.error('[Live Engine] Multi-source ingestion error:', err.message);
+    store.addError('LiveEngine', err.message);
+
+    store.setConnectorStatus({
+      platform: 'amazon',
+      status: 'DEGRADED',
+      lastSuccessAt: null,
+      lastErrorAt: new Date().toISOString(),
+      errorMessage: err.message,
+      eventsProcessed: totalEventsProcessed,
+      avgLatencyMs: 0,
+    });
+
+    return [];
+  }
+}
+
+/**
+ * Background Deal Lifecycle Sweeper:
+ * Periodically re-verifies active deals in store every 5 minutes.
+ * If a product goes out of stock or price reverts, updates status & broadcasts.
+ */
+export async function sweepActiveDeals(): Promise<number> {
+  console.log('[Live Sweeper] Running active deal re-verification sweep...');
+  const deals = store.getActiveDealEvents();
+  let expiredCount = 0;
+
+  for (const deal of deals.slice(0, 15)) {
+    try {
+      const validation = await verifyLiveProduct(deal.product.url, deal.product.platform);
+      if (validation.verifiedLive && !validation.isAvailable) {
+        console.log(`[Live Sweeper] ⚠️ Product sold out / expired: ${deal.product.title}`);
+        deal.product.stockStatus = 'out_of_stock';
+        deal.isActive = false;
+        deal.expiresAt = new Date().toISOString();
+        store.addProduct(deal.product);
+        store.addDealEvent(deal);
+        broadcastDeal(deal);
+        expiredCount++;
+      }
+    } catch (e) {
+      // Ignore individual sweep failures
+    }
+  }
+
+  if (expiredCount > 0) {
+    console.log(`[Live Sweeper] Deactivated ${expiredCount} expired/sold-out deals.`);
+  }
+  return expiredCount;
+}
+
+export function startLiveEnginePolling(intervalMs: number = 30000) {
+  console.log(`[Live Engine] Starting Autonomous Multi-Source & Live Store Verification Engine (interval: ${intervalMs / 1000}s)`);
 
   // Immediate fetch on boot
   setTimeout(() => fetchLiveDealsFromStream().catch(() => {}), 1000);
@@ -250,11 +263,20 @@ export function startLiveEnginePolling(intervalMs: number = 15000) {
   pollTimer = setInterval(() => {
     fetchLiveDealsFromStream().catch(() => {});
   }, intervalMs);
+
+  // Run deal sweeper every 5 minutes (300,000 ms)
+  sweeperTimer = setInterval(() => {
+    sweepActiveDeals().catch(() => {});
+  }, 300000);
 }
 
 export function stopLiveEnginePolling() {
   if (pollTimer) {
     clearInterval(pollTimer);
     pollTimer = null;
+  }
+  if (sweeperTimer) {
+    clearInterval(sweeperTimer);
+    sweeperTimer = null;
   }
 }

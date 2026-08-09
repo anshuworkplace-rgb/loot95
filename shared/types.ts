@@ -25,6 +25,8 @@ export type ConnectorStatus = 'ONLINE' | 'DEGRADED' | 'OFFLINE' | 'ERROR' | 'STA
 
 export interface Product {
   id: string;
+  asin?: string;
+  fsid?: string;
   brand: string;
   model: string;
   title: string;
@@ -40,6 +42,8 @@ export interface Product {
   sellerName: string;
   sellerRating: number;
   stockStatus: 'in_stock' | 'low_stock' | 'out_of_stock';
+  verifiedLive?: boolean;
+  sourceName?: string;
   rating: number;
   reviewCount: number;
   couponRequired: boolean;
@@ -115,6 +119,18 @@ export interface LootScoreComponents {
   confidenceAdjustment: number;  // 0-1: Scale by data confidence
 }
 
+export interface DealAnomalyMetrics {
+  normalPrice: number;
+  typicalLowestPrice: number;
+  currentPrice: number;
+  historicalPercentile: number;
+  rarityLabel: 'VERY HIGH' | 'HIGH' | 'MODERATE' | 'LOW';
+  priceAnomalyScore: number;
+  demandLabel: 'EXTREME' | 'HIGH' | 'MODERATE' | 'NORMAL';
+  sellerConfidenceLabel: 'VERY HIGH' | 'HIGH' | 'MODERATE' | 'LOW';
+  compositeDealScore: number;
+}
+
 // ─── Deal Event ───────────────────────────────────────────────
 
 export interface DealEvent {
@@ -125,6 +141,7 @@ export interface DealEvent {
   lootScore: number;
   rarityScore: number;
   scoreComponents: LootScoreComponents;
+  anomalyMetrics?: DealAnomalyMetrics;
   confidence: number;
   confidenceReason: string;
   currentPrice: number;
