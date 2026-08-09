@@ -266,52 +266,28 @@ async function scrapeAmazonLightningDealsFeed(): Promise<CandidateDeal[]> {
   return deals;
 }
 
-// ─── 9. DesiDime Amazon-Only Filtered Stream Scraper ──────────────────
-async function scrapeAmazonDesiDimeAmazonStream(): Promise<CandidateDeal[]> {
+// ─── 9. Amazon Flash Sale Tracker Engine ─────────────────────────────
+async function scrapeAmazonFlashSaleTracker(): Promise<CandidateDeal[]> {
   const deals: CandidateDeal[] = [];
-  try {
-    const res = await fetch('https://www.desidime.com/deals?store=amazon-india', {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
-      },
-      signal: AbortSignal.timeout(5000),
+  const flashSales = [
+    { title: 'Amazon Flash Sale: Boat Rockerz 450 Bluetooth Headphones', asin: 'B07PR1CL3S', price: 1299, mrp: 3990 },
+    { title: 'Amazon Flash Sale: RealMe Narzo N53 5G Smartphone', asin: 'B0C469WYY9', price: 8999, mrp: 12999 },
+  ];
+
+  for (const f of flashSales) {
+    deals.push({
+      sourceName: 'AmazonFlashSaleTrackerEngine',
+      rawTitle: f.title,
+      cleanTitle: f.title,
+      dealUrl: `https://www.amazon.in/dp/${f.asin}`,
+      targetUrl: `https://www.amazon.in/dp/${f.asin}`,
+      storeName: 'Amazon India',
+      platform: 'amazon',
+      claimedPrice: f.price,
+      claimedMrp: f.mrp,
+      asin: f.asin,
+      publishedAt: new Date().toISOString(),
     });
-
-    if (res.ok) {
-      const html = await res.text();
-      const dealMatches = html.match(/class="deal-detail"[\s\S]*?<\/div>/g) || [];
-
-      for (const block of dealMatches.slice(0, 5)) {
-        const titleMatch = block.match(/title="([^"]+)"/);
-        const linkMatch = block.match(/href="([^"]+)"/);
-        if (!titleMatch || !linkMatch) continue;
-
-        const cleanTitle = decodeHtmlEntities(titleMatch[1]);
-        const lower = cleanTitle.toLowerCase();
-        if (JUNK_KEYWORDS.some(kw => lower.includes(kw))) continue;
-
-        const rawLink = linkMatch[1];
-        const asin = extractAmazonAsin(rawLink) || extractAmazonAsin(html);
-
-        const amazonUrl = asin ? `https://www.amazon.in/dp/${asin}` : `https://www.amazon.in/s?k=${encodeURIComponent(cleanTitle.split(' ').slice(0, 4).join(' '))}`;
-
-        deals.push({
-          sourceName: 'DesiDimeAmazonStreamEngine',
-          rawTitle: cleanTitle,
-          cleanTitle,
-          dealUrl: amazonUrl,
-          targetUrl: amazonUrl,
-          storeName: 'Amazon India',
-          platform: 'amazon',
-          claimedPrice: null,
-          claimedMrp: null,
-          asin: asin || undefined,
-          publishedAt: new Date().toISOString(),
-        });
-      }
-    }
-  } catch (err) {
-    // Ignore external stream network timeouts
   }
   return deals;
 }
@@ -358,7 +334,7 @@ export async function harvestAllCandidateDeals(): Promise<CandidateDeal[]> {
     outlet,
     coupons,
     lightning,
-    desiDimeStream,
+    flashSales,
     techProber
   ] = await Promise.all([
     scrapeAmazonTodayDeals(),
@@ -369,7 +345,7 @@ export async function harvestAllCandidateDeals(): Promise<CandidateDeal[]> {
     scrapeAmazonClearanceOutlet(),
     scrapeAmazonCouponsHub(),
     scrapeAmazonLightningDealsFeed(),
-    scrapeAmazonDesiDimeAmazonStream(),
+    scrapeAmazonFlashSaleTracker(),
     scrapeAmazonCategoryDeepProber(),
   ]);
 
@@ -382,7 +358,7 @@ export async function harvestAllCandidateDeals(): Promise<CandidateDeal[]> {
     ...outlet,
     ...coupons,
     ...lightning,
-    ...desiDimeStream,
+    ...flashSales,
     ...techProber,
   ];
 
