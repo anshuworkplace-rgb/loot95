@@ -49,17 +49,20 @@ export async function processPriceEvent(product: Product, priceEvent: PriceEvent
   }
   store.setStats(product.id, allStats);
 
-  // Use 30d stats as primary, fall back to any available
-  const primaryStats = allStats.find(s => s.period === '30d')
-    || allStats.find(s => s.period === '90d')
-    || allStats[0] || null;
+  // Use 30d stats as primary if sufficient history exists (>= 5 data points)
+  const hasSufficientHistory = primaryStats && primaryStats.sampleCount >= 5;
 
   // ─── DETERMINE NORMAL PRICE ───────────────────────────────
-  const normalPrice = primaryStats?.median || product.mrp * 0.85; // If no history, assume ~15% off MRP as "normal"
-  const historicalMedian = primaryStats?.median || normalPrice;
-  const historicalLow = primaryStats?.min || priceEvent.effectivePrice;
+  // If sufficient history exists, use historical median. Otherwise, estimate normal market price from MRP (~18% typical discount)
+  const estimatedNormalFromMrp = product.mrp > priceEvent.effectivePrice
+    ? Math.max(priceEvent.effectivePrice * 1.05, Math.round(product.mrp * 0.82))
+    : priceEvent.effectivePrice;
 
-  // Real discount = discount vs actual normal selling price (NOT MRP)
+  const normalPrice = hasSufficientHistory ? primaryStats.median : estimatedNormalFromMrp;
+  const historicalMedian = hasSufficientHistory ? primaryStats.median : normalPrice;
+  const historicalLow = primaryStats ? primaryStats.min : priceEvent.effectivePrice;
+
+  // Real discount = discount vs actual normal market selling price
   const realDiscountPct = Math.round((normalPrice - priceEvent.effectivePrice) / normalPrice * 100);
 
   // Fast reject: less than 30% real discount → not interesting enough
