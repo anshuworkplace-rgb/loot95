@@ -11,6 +11,7 @@ import path from 'path';
 import { store } from './store.js';
 import { sseClients, broadcastStatus } from './engine/pipeline.js';
 import { startRealAmazonPolling, stopRealAmazonPolling, getRapidApiDiagnostics } from './connectors/rapidapi.js';
+import { startLiveEnginePolling, stopLiveEnginePolling } from './connectors/live_engine.js';
 import type { DiagnosticsSubsystem } from '../shared/types.js';
 
 const app = express();
@@ -263,30 +264,40 @@ app.get('/api/diagnostics', (_req, res) => {
   // ─── Subsystem Checks ────────────────────────────────────
   const subsystems: DiagnosticsSubsystem[] = [];
 
-  // 1. RapidAPI Amazon Connector
+  // 1. Zero-Cost Live E-Commerce Deal Engine
   const amazonConnector = connectors.find(c => c.platform === 'amazon');
   subsystems.push({
-    name: 'RapidAPI Amazon India Connector',
+    name: 'Zero-Cost Live Deal Engine',
+    status: amazonConnector?.status === 'ONLINE' ? 'OK' : amazonConnector?.status === 'ERROR' ? 'ERROR' : 'WARNING',
+    message: amazonConnector?.status === 'ONLINE'
+      ? `Connected & Ingesting. ${amazonConnector.eventsProcessed} live deals processed. Latency: ${amazonConnector.avgLatencyMs}ms`
+      : amazonConnector?.errorMessage || 'Initializing live deal feed...',
+    lastChecked: now,
+    details: {
+      eventsProcessed: amazonConnector?.eventsProcessed || 0,
+      avgLatencyMs: amazonConnector?.avgLatencyMs || 0,
+      lastSuccessAt: amazonConnector?.lastSuccessAt,
+    },
+  });
+
+  // 2. RapidAPI Amazon Connector (Optional)
+  subsystems.push({
+    name: 'RapidAPI Amazon India Connector (Optional)',
     status: !rapidApiDiag.apiKeyConfigured
       ? 'UNCONFIGURED'
-      : amazonConnector?.status === 'ONLINE'
-        ? 'OK'
-        : amazonConnector?.status === 'ERROR'
+      : rapidApiDiag.lastApiError?.includes('429')
+        ? 'WARNING'
+        : rapidApiDiag.totalApiFailures > 0
           ? 'ERROR'
-          : 'WARNING',
+          : 'OK',
     message: !rapidApiDiag.apiKeyConfigured
-      ? 'RAPIDAPI_KEY not set in environment variables'
-      : amazonConnector?.status === 'ONLINE'
-        ? `Connected. ${amazonConnector.eventsProcessed} events processed. Last success: ${amazonConnector.lastSuccessAt || 'N/A'}`
-        : amazonConnector?.errorMessage || 'Status unknown',
+      ? 'RAPIDAPI_KEY not set (using Zero-Cost Engine)'
+      : rapidApiDiag.lastApiError?.includes('429')
+        ? 'Rate limit hit (429). Falling back to 100% Zero-Cost Live Engine.'
+        : `Connected. ${rapidApiDiag.totalApiCalls} API calls made.`,
     lastChecked: now,
     details: {
       ...rapidApiDiag,
-      connectorStatus: amazonConnector?.status || 'NOT_INITIALIZED',
-      lastSuccessAt: amazonConnector?.lastSuccessAt,
-      lastErrorAt: amazonConnector?.lastErrorAt,
-      eventsProcessed: amazonConnector?.eventsProcessed || 0,
-      avgLatencyMs: amazonConnector?.avgLatencyMs || 0,
     },
   });
 
@@ -415,9 +426,14 @@ app.listen(PORT, () => {
   // Always purge any leftover simulated data from old runs
   store.purgeSimulatedData();
 
-  // Start real Amazon India deal polling
-  console.log('[Server] Starting 100% REAL DATA MODE — Amazon India API connector.');
-  startRealAmazonPolling(20000);
+  // Start 24/7 Zero-Cost Live Deal Ingestion Engine (never stops, 0 cost)
+  console.log('[Server] Launching 24/7/365 Zero-Cost Live Deal Engine...');
+  startLiveEnginePolling(15000);
+
+  // Also start RapidAPI polling if configured
+  if (process.env.RAPIDAPI_KEY) {
+    startRealAmazonPolling(30000);
+  }
 
   // Broadcast status & heartbeat every 5 seconds to keep SSE clients alive
   setInterval(() => broadcastStatus(), 5000);
@@ -427,12 +443,14 @@ app.listen(PORT, () => {
 
 process.on('SIGINT', () => {
   console.log('\n[Server] Shutting down...');
+  stopLiveEnginePolling();
   stopRealAmazonPolling();
   store.shutdown();
   process.exit(0);
 });
 
 process.on('SIGTERM', () => {
+  stopLiveEnginePolling();
   stopRealAmazonPolling();
   store.shutdown();
   process.exit(0);
