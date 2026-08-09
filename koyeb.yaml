@@ -1,0 +1,31 @@
+# ═══════════════════════════════════════════════════════════════
+# LOOT 95 — Production Koyeb Deployment Specification
+# ═══════════════════════════════════════════════════════════════
+
+name: loot95
+type: web
+
+git:
+  repository: github.com/anshuworkplace-rgb/loot95
+  branch: master
+
+builder: docker
+dockerfile: ./Dockerfile
+
+env:
+  - key: PORT
+    value: "3001"
+  - key: GEMINI_API_KEY
+    value: ${GEMINI_API_KEY}
+  - key: RAPIDAPI_KEY
+    value: ${RAPIDAPI_KEY}
+  - key: RAPIDAPI_HOST
+    value: "real-time-amazon-data.p.rapidapi.com"
+
+ports:
+  - port: 3001
+    path: /
+
+routes:
+  - path: /
+    port: 3001
