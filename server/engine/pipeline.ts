@@ -23,10 +23,24 @@ const config = DEFAULT_SCORING_CONFIG;
 // SSE clients for real-time push
 export const sseClients: Set<import('express').Response> = new Set();
 
+const JUNK_ACCESSORY_KEYWORDS = [
+  'back cover', 'case', 'cover', 'silicon', 'silicone', 'tempered glass', 'screen protector',
+  'guard', 'cable', 'adapter', 'charger cable', 'pouch', 'strap', 'skin', 'holder',
+  'stand', 'converter', 'lanyard', 'film', 'sleeve', 'keychain', 'tpu'
+];
+
 // ─── Main Pipeline ────────────────────────────────────────────
 
 export async function processPriceEvent(product: Product, priceEvent: PriceEvent): Promise<DealEvent | null> {
   const startTime = Date.now();
+
+  // ─── ANTI-JUNK FILTER: Reject cheap accessories (covers, cases, screen guards) ───
+  const lowerTitle = product.title.toLowerCase();
+  const isJunkAccessory = JUNK_ACCESSORY_KEYWORDS.some(kw => lowerTitle.includes(kw));
+  if (isJunkAccessory) {
+    store.incrementProcessedEvents();
+    return null;
+  }
 
   // ─── FAST PATH: Reject non-interesting events ─────────────
   const mrpDiscount = (product.mrp - priceEvent.effectivePrice) / product.mrp * 100;

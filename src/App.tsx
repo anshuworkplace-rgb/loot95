@@ -184,58 +184,179 @@ export function App() {
   );
 }
 
-// ─── Preferences View Component ────────────────────────────────
+// ─── 10x Upgraded Personal Radar View Component ────────────────
 
 const PreferencesView: React.FC = () => {
-  return (
-    <div style={{ padding: '32px', maxWidth: '800px' }}>
-      <h2 style={{ fontSize: '1.2rem', marginBottom: '16px' }}>PERSONAL DEAL RADAR CONFIGURATION</h2>
-      <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '24px' }}>
-        Configure your private deal intelligence thresholds. The engine will alert you only when deals meet your custom criteria.
-      </p>
+  const [minDiscount, setMinDiscount] = useState('80');
+  const [minPrice, setMinPrice] = useState('1000');
+  const [excludeAccessories, setExcludeAccessories] = useState(true);
+  const [savedStatus, setSavedStatus] = useState('');
 
-      <div style={{ background: 'var(--bg-surface)', padding: '24px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+  const [categories, setCategories] = useState({
+    smartphones: true,
+    laptops: true,
+    audio: true,
+    tvs: true,
+    gaming: true,
+    appliances: true,
+  });
+
+  const [brands, setBrands] = useState({
+    apple: true,
+    sony: true,
+    samsung: true,
+    oneplus: true,
+    lenovo: true,
+    asus: true,
+    lg: true,
+  });
+
+  const handleSave = () => {
+    const prefs = { minDiscount, minPrice, excludeAccessories, categories, brands };
+    localStorage.setItem('loot95_user_prefs', JSON.stringify(prefs));
+    setSavedStatus('⚡ PREFERENCES SAVED & APPLIED TO INTELLIGENCE ENGINE');
+    setTimeout(() => setSavedStatus(''), 4000);
+  };
+
+  return (
+    <div style={{ padding: '32px', maxWidth: '850px', fontFamily: 'var(--font-mono)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
+        <span style={{ fontSize: '1.8rem' }}>🎯</span>
         <div>
-          <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: '8px' }}>
-            MINIMUM REAL DISCOUNT THRESHOLD
+          <h2 style={{ fontSize: '1.3rem', fontWeight: 800, color: '#fff', letterSpacing: '0.5px' }}>
+            PERSONAL DEAL RADAR (10X ENGINE CONTROL)
+          </h2>
+          <p style={{ color: 'var(--loot-green)', fontSize: '0.8rem', marginTop: '2px' }}>
+            Configure strict AI filters to eliminate covers/cases and deliver only genuine high-value electronics.
+          </p>
+        </div>
+      </div>
+
+      <div style={{ background: 'var(--bg-surface)', padding: '24px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)', display: 'flex', flexDirection: 'column', gap: '24px', boxShadow: '0 8px 32px rgba(0,0,0,0.4)' }}>
+        
+        {/* Anti-Junk Shield */}
+        <div style={{ background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.3)', padding: '16px', borderRadius: 'var(--radius-sm)' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}>
+            <input
+              type="checkbox"
+              checked={excludeAccessories}
+              onChange={(e) => setExcludeAccessories(e.target.checked)}
+              style={{ width: '18px', height: '18px', accentColor: 'var(--loot-green)', cursor: 'pointer' }}
+            />
+            <div>
+              <div style={{ color: 'var(--loot-green)', fontWeight: 800, fontSize: '0.9rem' }}>
+                🛡️ ANTI-JUNK ACCESSORY SHIELD (RECOMMENDED)
+              </div>
+              <div style={{ color: 'var(--text-secondary)', fontSize: '0.75rem', marginTop: '2px' }}>
+                Automatically reject phone back covers, silicone cases, tempered glass, cables, adapters, and cheap trinkets under ₹500.
+              </div>
+            </div>
           </label>
-          <select style={{ width: '100%', padding: '10px', background: 'var(--bg-deep)', border: '1px solid var(--border-default)', color: 'var(--text-primary)', borderRadius: 'var(--radius-sm)' }}>
-            <option value="90">90%+ Real Discount (LOOT 95 Only)</option>
-            <option value="80">80%+ Real Discount (Extreme Deals)</option>
-            <option value="60">60%+ Real Discount (Hot Deals)</option>
-            <option value="50">50%+ Real Discount (All Deals)</option>
+        </div>
+
+        {/* Minimum Price Floor */}
+        <div>
+          <label style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-secondary)', display: 'block', marginBottom: '8px' }}>
+            💰 MINIMUM PRODUCT PRICE FLOOR
+          </label>
+          <select
+            value={minPrice}
+            onChange={(e) => setMinPrice(e.target.value)}
+            style={{ width: '100%', padding: '12px', background: 'var(--bg-deep)', border: '1px solid var(--border-default)', color: 'var(--text-primary)', borderRadius: 'var(--radius-sm)', cursor: 'pointer' }}
+          >
+            <option value="0">Any Price (Include budget items)</option>
+            <option value="1000">₹1,000+ (Exclude cheap sub-₹1000 accessories)</option>
+            <option value="3000">₹3,000+ (Major Audio, Smartwatches, Tablets)</option>
+            <option value="10000">₹10,000+ (Smartphones, Laptops, 4K TVs Only)</option>
           </select>
         </div>
 
+        {/* Minimum Discount Threshold */}
         <div>
-          <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: '8px' }}>
-            TARGET CATEGORIES
+          <label style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-secondary)', display: 'block', marginBottom: '8px' }}>
+            🔥 MINIMUM REAL DISCOUNT THRESHOLD
           </label>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
-            {['Electronics', 'Smartphones', 'Laptops', 'Audio & Headphones', 'TVs & Appliances', 'Cameras & Accessories'].map(cat => (
-              <label key={cat} style={{ fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
-                <input type="checkbox" defaultChecked /> {cat}
+          <select
+            value={minDiscount}
+            onChange={(e) => setMinDiscount(e.target.value)}
+            style={{ width: '100%', padding: '12px', background: 'var(--bg-deep)', border: '1px solid var(--border-default)', color: 'var(--text-primary)', borderRadius: 'var(--radius-sm)', cursor: 'pointer' }}
+          >
+            <option value="90">90%+ Real Discount (LOOT 95 Events Only)</option>
+            <option value="80">80%+ Real Discount (Extreme Drops & Price Errors)</option>
+            <option value="50">50%+ Real Discount (Hot & Major Deals)</option>
+            <option value="30">30%+ Real Discount (All Genuine Offers)</option>
+          </select>
+        </div>
+
+        {/* Target Categories */}
+        <div>
+          <label style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-secondary)', display: 'block', marginBottom: '10px' }}>
+            📱 HIGH-VALUE TARGET CATEGORIES
+          </label>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
+            {[
+              { id: 'smartphones', label: '📱 Smartphones' },
+              { id: 'laptops', label: '💻 Laptops' },
+              { id: 'audio', label: '🎧 Headphones / Earbuds' },
+              { id: 'tvs', label: '📺 Smart 4K TVs' },
+              { id: 'gaming', label: '🎮 PS5 & Gaming' },
+              { id: 'appliances', label: '⚡ Premium Appliances' },
+            ].map(cat => (
+              <label key={cat.id} style={{ fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', background: 'var(--bg-deep)', padding: '8px 12px', borderRadius: '4px', border: '1px solid var(--border-subtle)' }}>
+                <input
+                  type="checkbox"
+                  checked={(categories as any)[cat.id]}
+                  onChange={(e) => setCategories({ ...categories, [cat.id]: e.target.checked })}
+                />
+                {cat.label}
               </label>
             ))}
           </div>
         </div>
 
+        {/* Premium Brand Filter */}
         <div>
-          <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: '8px' }}>
-            NOTIFICATION CHANNELS
+          <label style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-secondary)', display: 'block', marginBottom: '10px' }}>
+            ⭐ PREMIUM BRAND PREFERENCES
           </label>
-          <div style={{ display: 'flex', gap: '16px' }}>
-            <label style={{ fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <input type="checkbox" defaultChecked /> Browser Web Push
-            </label>
-            <label style={{ fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <input type="checkbox" defaultChecked /> Email Alerts
-            </label>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+            {['Apple', 'Sony', 'Samsung', 'OnePlus', 'Lenovo', 'Asus', 'LG'].map(b => {
+              const key = b.toLowerCase();
+              const active = (brands as any)[key];
+              return (
+                <button
+                  key={b}
+                  type="button"
+                  onClick={() => setBrands({ ...brands, [key]: !active })}
+                  style={{
+                    padding: '6px 14px',
+                    fontSize: '0.75rem',
+                    fontWeight: 700,
+                    borderRadius: '20px',
+                    border: active ? '1px solid var(--loot-green)' : '1px solid var(--border-subtle)',
+                    background: active ? 'rgba(16, 185, 129, 0.2)' : 'var(--bg-deep)',
+                    color: active ? 'var(--loot-green)' : 'var(--text-muted)',
+                    cursor: 'pointer',
+                  }}
+                >
+                  {active ? `✓ ${b}` : b}
+                </button>
+              );
+            })}
           </div>
         </div>
 
-        <button style={{ padding: '12px 24px', background: 'var(--loot-green)', color: '#000', border: 'none', fontWeight: 700, borderRadius: 'var(--radius-sm)', cursor: 'pointer', fontFamily: 'var(--font-mono)' }}>
-          SAVE PREFERENCES
+        {savedStatus && (
+          <div style={{ padding: '12px', background: 'rgba(16, 185, 129, 0.15)', border: '1px solid var(--loot-green)', color: 'var(--loot-green)', fontSize: '0.8rem', fontWeight: 700, borderRadius: 'var(--radius-sm)', textAlign: 'center' }}>
+            {savedStatus}
+          </div>
+        )}
+
+        <button
+          onClick={handleSave}
+          style={{ padding: '14px 24px', background: 'var(--loot-green)', color: '#000', border: 'none', fontWeight: 800, fontSize: '0.85rem', borderRadius: 'var(--radius-sm)', cursor: 'pointer', fontFamily: 'var(--font-mono)', letterSpacing: '0.5px', boxShadow: '0 0 16px var(--loot-green-glow)' }}
+        >
+          ⚡ SAVE & APPLY 10X RADAR FILTERS
         </button>
       </div>
     </div>
